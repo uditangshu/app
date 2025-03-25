@@ -83,7 +83,6 @@ export default function LoginScreen() {
                 placeholderTextColor={theme.COLORS.text.secondary}
                 value={employee_id}
                 onChangeText={setEmployeeId}
-                keyboardType="number-pad"
                 autoCapitalize="none"
                 autoComplete="off"
               />

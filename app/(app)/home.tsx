@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,9 @@ import {
   Platform,
   ViewStyle,
   ActivityIndicator,
+  Animated,
+  Dimensions,
+  PanResponder,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +19,7 @@ import { useRouter } from 'expo-router';
 import theme from '../../constants/theme';
 import { horizontalScale, verticalScale, moderateScale, fontScale } from '../../utils/responsive';
 import { useAuth } from '../../contexts/AuthContext';
+import ChatScreen from '../modals/chat';
 
 interface EventItem {
   id: string;
@@ -52,7 +56,34 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [isChatVisible, setIsChatVisible] = useState(false);
+  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const PAGE_SIZE = 3;
+
+  const pan = useRef(new Animated.ValueXY()).current;
+  const chatHeight = useRef(new Animated.Value(0)).current;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          pan.setValue({ x: 0, y: gestureState.dy });
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 100) {
+          dismissChat();
+        } else {
+          Animated.spring(pan, {
+            toValue: { x: 0, y: 0 },
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
 
   const fetchChats = async () => {
     try {
@@ -95,6 +126,44 @@ export default function HomeScreen() {
     }
   };
 
+  const showChat = (chatId?: string) => {
+    if (chatId) {
+      setSelectedChatId(chatId);
+    }
+    setIsChatVisible(true);
+    
+    
+    Animated.spring(chatHeight, {
+      toValue: 1,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  const dismissChat = () => {
+    
+      Animated.timing(chatHeight, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: false,
+      }).start(() => {
+        setIsChatVisible(false);
+        setSelectedChatId(null);
+        
+      })
+      
+  };
+
+  const chatTranslateY = pan.y.interpolate({
+    inputRange: [0, Dimensions.get('window').height],
+    outputRange: [0, Dimensions.get('window').height],
+    extrapolate: 'clamp',
+  });
+
+  const chatOpacity = chatHeight.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
+
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
@@ -115,10 +184,7 @@ export default function HomeScreen() {
                   <Text style={styles.badgeText}>3</Text>
                 </View>
               </TouchableOpacity>
-              {/* <TouchableOpacity style={styles.profileButton}>
-                <Text style={styles.profileText}>EMP2001</Text>
-                <Ionicons name="chevron-down" size={20} color="white" />
-              </TouchableOpacity> */}
+              
             </View>
           </View>
 
@@ -166,7 +232,7 @@ export default function HomeScreen() {
                   <TouchableOpacity 
                     key={chat.chat_id} 
                     style={styles.chatItem}
-                    onPress={() => router.push(`/view-chat?chatId=${encodeURIComponent(chat.chat_id)}`)}
+                    onPress={() => showChat(chat.chat_id)}
                   >
                     <View style={styles.chatIconContainer}>
                       <Ionicons 
@@ -212,12 +278,38 @@ export default function HomeScreen() {
           {/* Chat Button */}
           <TouchableOpacity 
             style={styles.chatButton}
-            onPress={() => router.push('/chat')}
+            onPress={() => showChat()}
           >
             <Ionicons name="chatbubbles-outline" size={24} color="white" />
             <Text style={styles.chatButtonText}>Open Chat</Text>
           </TouchableOpacity>
         </ScrollView>
+
+        {/* Chat Modal */}
+        {isChatVisible && (
+          <Animated.View
+            style={[
+              styles.chatModal,
+              {
+                transform: [{ translateY: chatTranslateY }],
+                opacity: chatOpacity,
+                height: chatHeight.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, Dimensions.get('window').height],
+                }),
+              },
+            ]}
+            {...panResponder.panHandlers}
+          >
+            <View style={styles.chatHeader}>
+              <View style={styles.chatHandle} />
+              <TouchableOpacity onPress={dismissChat} style={styles.closeButton}>
+                <Ionicons name="close" size={24} color={theme.COLORS.text.primary} />
+              </TouchableOpacity>
+            </View>
+            <ChatScreen onClose={dismissChat} initialChatId={selectedChatId} />
+          </Animated.View>
+        )}
       </LinearGradient>
     </SafeAreaView>
   );
@@ -394,9 +486,11 @@ const styles = StyleSheet.create({
   },
   chatHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: verticalScale(4),
+    padding: moderateScale(16),
+    borderBottomWidth: 1,
+    borderBottomColor: theme.COLORS.border.main,
   },
   chatTime: {
     color: 'rgba(255,255,255,0.5)',
@@ -471,5 +565,28 @@ const styles = StyleSheet.create({
     fontSize: fontScale(16),
     ...theme.FONTS.medium,
     marginLeft: horizontalScale(8),
+  },
+  chatModal: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: theme.COLORS.border.main,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    overflow: 'hidden',
+  },
+  chatHandle: {
+    width: horizontalScale(40),
+    height: verticalScale(4),
+    backgroundColor: theme.COLORS.border.main,
+    borderRadius: 2,
+    marginBottom: verticalScale(8),
+  },
+  closeButton: {
+    position: 'absolute',
+    right: horizontalScale(16),
+    top: verticalScale(16),
   },
 });
