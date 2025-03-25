@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
-// import { API_URL } from '@env';
-const API_URL = 'https://backend-deployment-792.as.r.appspot.com/';
+
+const API_URL = 'https://backend-deployment-792.as.r.appspot.com';
+
 interface User {
   userRole: string;
   employee_id: string;
@@ -18,7 +19,7 @@ interface AuthState {
 }
 
 interface AuthContextType extends AuthState {
-  login: (email: string, password: string) => Promise<void>;
+  login: (employee_id: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshAccessToken: (newAccessToken: string) => Promise<void>;
 }
@@ -52,8 +53,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN),
       ]);
 
-      if (userStr && accessToken && refreshToken) {
-        const user = JSON.parse(userStr);
+      if (accessToken) {
+        const user = userStr ? JSON.parse(userStr) : null;
         setState({
           user,
           accessToken,
@@ -62,45 +63,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           isLoading: false,
         });
       } else {
-        setState(prev => ({ ...prev, isLoading: false }));
+        setState(prev => ({ 
+          ...prev, 
+          isAuthenticated: false,
+          isLoading: false 
+        }));
       }
     } catch (error) {
       console.error('Error loading auth state:', error);
-      setState(prev => ({ ...prev, isLoading: false }));
+      setState(prev => ({ 
+        ...prev, 
+        isAuthenticated: false,
+        isLoading: false 
+      }));
     }
   };
 
-  const login = async (email: string, password: string) => {
+  const login = async (employee_id: string, password: string) => {
     try {
       const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ employee_id, password }),
       });
 
-      if (!response.ok) {
-        throw new Error('Login failed');
+      const data = await response.json();
+
+      if (!response.ok || !data.access_token?.access_token) {
+        throw new Error(data.message || 'Login failed');
       }
 
-      const data = await response.json();
+      // Extract user data from the response
+      const userData: User = {
+        employee_id,
+        email: data.email || '',
+        userRole: data.role,
+      };
       
-      await Promise.all([
-        AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(data.user)),
-        AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, data.accessToken),
-        AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, data.refreshToken),
-      ]);
-
+      // First update the state
       setState({
-        user: data.user,
-        accessToken: data.accessToken,
-        refreshToken: data.refreshToken,
+        user: userData,
+        accessToken: data.access_token.access_token,
+        refreshToken: data.refresh_token,
         isAuthenticated: true,
         isLoading: false,
       });
 
-      router.push('/(app)/home' as any);
+      // Then store the data
+      await Promise.all([
+        AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userData)),
+        AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, data.access_token.access_token),
+        AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, data.refresh_token),
+      ]);
+
+      // Finally navigate using replace instead of push
+      router.replace('/(app)/home' as any);
     } catch (error) {
       console.error('Error during login:', error);
       throw error;

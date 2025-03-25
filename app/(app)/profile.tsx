@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../../constants/theme';
 import { horizontalScale, verticalScale, moderateScale, fontScale } from '../../utils/responsive';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ProfileMenuItem {
   icon: string;
@@ -53,23 +54,24 @@ const profileMenuItems: ProfileMenuItem[] = [
 ];
 
 export default function ProfileScreen() {
+  const { logout, user } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Error during logout:', error);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
         {/* Profile Header */}
         <View style={styles.header}>
-          <View style={styles.profileImageContainer}>
-            <Image
-              source={{ uri: 'https://via.placeholder.com/100' }}
-              style={styles.profileImage}
-            />
-            <TouchableOpacity style={styles.editImageButton}>
-              <Ionicons name="camera-outline" size={20} color="white" />
-            </TouchableOpacity>
+          <View style={styles.circleContainer}>
+            <Text style={styles.employeeId}>{user?.employee_id || 'N/A'}</Text>
           </View>
-          <Text style={styles.name}>John Doe</Text>
-          <Text style={styles.role}>Senior Software Engineer</Text>
-          <Text style={styles.department}>Technology Department</Text>
         </View>
 
         {/* Profile Menu */}
@@ -97,7 +99,10 @@ export default function ProfileScreen() {
         </View>
 
         {/* Logout Button */}
-        <TouchableOpacity style={styles.logoutButton}>
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={handleLogout}
+        >
           <Ionicons name="log-out-outline" size={24} color={theme.COLORS.error} />
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
@@ -119,43 +124,19 @@ const styles = StyleSheet.create({
     padding: horizontalScale(16),
     paddingTop: verticalScale(24),
   },
-  profileImageContainer: {
-    position: 'relative',
-    marginBottom: verticalScale(16),
-  },
-  profileImage: {
-    width: horizontalScale(100),
-    height: horizontalScale(100),
-    borderRadius: horizontalScale(50),
-  },
-  editImageButton: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
+  circleContainer: {
+    width: horizontalScale(120),
+    height: horizontalScale(120),
+    borderRadius: horizontalScale(60),
     backgroundColor: theme.COLORS.primary.main,
-    width: horizontalScale(32),
-    height: horizontalScale(32),
-    borderRadius: horizontalScale(16),
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: theme.COLORS.background.default,
+    marginBottom: verticalScale(24),
   },
-  name: {
-    color: theme.COLORS.text.primary,
-    fontSize: fontScale(24),
+  employeeId: {
+    color: theme.COLORS.background.paper,
+    fontSize: fontScale(20),
     ...theme.FONTS.bold,
-    marginBottom: verticalScale(4),
-  },
-  role: {
-    color: theme.COLORS.text.primary,
-    fontSize: fontScale(16),
-    ...theme.FONTS.medium,
-    marginBottom: verticalScale(4),
-  },
-  department: {
-    color: theme.COLORS.text.secondary,
-    fontSize: fontScale(14),
   },
   menuContainer: {
     padding: horizontalScale(16),

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Stack } from 'expo-router';
+import { Stack, Redirect } from 'expo-router';
 import { AuthProvider } from '../contexts/AuthContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ActivityIndicator, View } from 'react-native';
@@ -18,10 +18,16 @@ function RootLayoutNav() {
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      {!isAuthenticated ? (
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+      {isAuthenticated ? (
+        <Stack.Screen 
+          name="(app)" 
+          options={{ headerShown: false }} 
+        />
       ) : (
-        <Stack.Screen name="(app)" options={{ headerShown: false }} />
+        <Stack.Screen 
+          name="(auth)" 
+          options={{ headerShown: false }} 
+        />
       )}
     </Stack>
   );
@@ -29,7 +35,7 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   return (
-    <AuthProvider >
+    <AuthProvider>
       <RootLayoutNav />
     </AuthProvider>
   );

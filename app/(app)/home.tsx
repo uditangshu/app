@@ -9,6 +9,7 @@ import {
   Platform,
   ViewStyle,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../../constants/theme';
 import { horizontalScale, verticalScale, moderateScale, fontScale } from '../../utils/responsive';
@@ -40,38 +41,41 @@ const chats: ChatItem[] = [
 export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.welcomeText}>Welcome, EMP2001</Text>
-            <Text style={styles.subtitleText}>Your employee dashboard</Text>
+      <LinearGradient
+        colors={['#1C8D3A', '#165C27', '#0A3814']}
+        style={styles.gradientBackground}
+      >
+        <ScrollView style={styles.scrollView}>
+          {/* Header */}
+          <View style={styles.header}>
+            <View>
+              <Text style={styles.welcomeText}>Welcome, EMP2001</Text>
+              <Text style={styles.subtitleText}>Your employee dashboard</Text>
+            </View>
+            <View style={styles.headerRight}>
+              <TouchableOpacity style={styles.notificationButton}>
+                <Ionicons name="notifications-outline" size={24} color="white" />
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.badgeText}>3</Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.profileButton}>
+                <Text style={styles.profileText}>EMP2001</Text>
+                <Ionicons name="chevron-down" size={20} color="white" />
+              </TouchableOpacity>
+            </View>
           </View>
-          <View style={styles.headerRight}>
-            <TouchableOpacity style={styles.notificationButton}>
-              <Ionicons name="notifications-outline" size={24} color="white" />
-              <View style={styles.notificationBadge}>
-                <Text style={styles.badgeText}>3</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.profileButton}>
-              <Text style={styles.profileText}>EMP2001</Text>
-              <Ionicons name="chevron-down" size={20} color="white" />
-            </TouchableOpacity>
-          </View>
-        </View>
 
-        {/* Upcoming Events Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="calendar-outline" size={24} color="white" />
-            <Text style={styles.sectionTitle}>Upcoming Events</Text>
-          </View>
-          <Text style={styles.sectionSubtitle}>Your scheduled events and deadlines</Text>
-          
-          {events.map((event) => (
-            <>
-              <View style={styles.eventItem}>
+          {/* Upcoming Events Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="calendar-outline" size={24} color="white" />
+              <Text style={styles.sectionTitle}>Upcoming Events</Text>
+            </View>
+            <Text style={styles.sectionSubtitle}>Your scheduled events and deadlines</Text>
+            
+            {events.map((event) => (
+              <View key={event.id} style={styles.eventItem}>
                 <View style={styles.eventInfo}>
                   <Text style={styles.eventTitle}>{event.title}</Text>
                   <Text style={styles.eventDate}>{event.date}</Text>
@@ -80,66 +84,66 @@ export default function HomeScreen() {
                   <Text style={styles.eventBadgeText}>{event.type}</Text>
                 </View>
               </View>
-            </>
-          ))}
+            ))}
 
-          <TouchableOpacity style={styles.viewMoreButton}>
-            <Text style={styles.viewMoreText}>View Calendar</Text>
-            <Ionicons name="arrow-forward" size={20} color={theme.COLORS.primary.main} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Recent Chats Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="chatbubbles-outline" size={24} color="white" />
-            <Text style={styles.sectionTitle}>Recent Chats</Text>
+            <TouchableOpacity style={styles.viewMoreButton}>
+              <Text style={styles.viewMoreText}>View Calendar</Text>
+              <Ionicons name="arrow-forward" size={20} color="#1C8D3A" />
+            </TouchableOpacity>
           </View>
-          <Text style={styles.sectionSubtitle}>Your recent conversations</Text>
 
-          {chats.map((chat, index) => (
-            <TouchableOpacity key={index} style={styles.chatItem}>
-              <Ionicons name="chatbubble-outline" size={24} color={theme.COLORS.primary.main} />
-              <View style={styles.chatInfo}>
-                <Text style={styles.chatTitle}>{chat.department}</Text>
-                <Text style={styles.chatMessage}>{chat.message}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-
-          <TouchableOpacity style={styles.openChatButton}>
-            <Text style={styles.openChatText}>Open Chat</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Quick Actions Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="flash-outline" size={24} color="white" />
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
-          </View>
-          <Text style={styles.sectionSubtitle}>Common tasks and resources</Text>
-
-          <View style={styles.quickActionsGrid}>
-            <TouchableOpacity style={styles.quickActionButton}>
-              <Ionicons name="document-text-outline" size={24} color="white" />
-              <Text style={styles.quickActionText}>Documents</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickActionButton}>
-              <Ionicons name="calendar-outline" size={24} color="white" />
-              <Text style={styles.quickActionText}>Schedule</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickActionButton}>
-              <Ionicons name="notifications-outline" size={24} color="white" />
-              <Text style={styles.quickActionText}>Notifications</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickActionButton}>
+          {/* Recent Chats Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
               <Ionicons name="chatbubbles-outline" size={24} color="white" />
-              <Text style={styles.quickActionText}>Messages</Text>
+              <Text style={styles.sectionTitle}>Recent Chats</Text>
+            </View>
+            <Text style={styles.sectionSubtitle}>Your recent conversations</Text>
+
+            {chats.map((chat, index) => (
+              <TouchableOpacity key={index} style={styles.chatItem}>
+                <Ionicons name="chatbubble-outline" size={24} color="#1C8D3A" />
+                <View style={styles.chatInfo}>
+                  <Text style={styles.chatTitle}>{chat.department}</Text>
+                  <Text style={styles.chatMessage}>{chat.message}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+
+            <TouchableOpacity style={styles.openChatButton}>
+              <Text style={styles.openChatText}>Open Chat</Text>
             </TouchableOpacity>
           </View>
-        </View>
-      </ScrollView>
+
+          {/* Quick Actions Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="flash-outline" size={24} color="white" />
+              <Text style={styles.sectionTitle}>Quick Actions</Text>
+            </View>
+            <Text style={styles.sectionSubtitle}>Common tasks and resources</Text>
+
+            <View style={styles.quickActionsGrid}>
+              <TouchableOpacity style={styles.quickActionButton}>
+                <Ionicons name="document-text-outline" size={24} color="white" />
+                <Text style={styles.quickActionText}>Documents</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.quickActionButton}>
+                <Ionicons name="calendar-outline" size={24} color="white" />
+                <Text style={styles.quickActionText}>Schedule</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.quickActionButton}>
+                <Ionicons name="notifications-outline" size={24} color="white" />
+                <Text style={styles.quickActionText}>Notifications</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.quickActionButton}>
+                <Ionicons name="chatbubbles-outline" size={24} color="white" />
+                <Text style={styles.quickActionText}>Messages</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      </LinearGradient>
     </SafeAreaView>
   );
 }
@@ -147,7 +151,9 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.COLORS.background.default,
+  },
+  gradientBackground: {
+    flex: 1,
   },
   scrollView: {
     flex: 1,
@@ -158,14 +164,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: horizontalScale(16),
     paddingTop: Platform.OS === 'android' ? verticalScale(40) : verticalScale(16),
+    backgroundColor: 'transparent',
   },
   welcomeText: {
-    color: theme.COLORS.text.primary,
+    color: 'white',
     fontSize: fontScale(24),
-    ...theme.FONTS.bold,
+    fontWeight: 'bold',
   },
   subtitleText: {
-    color: theme.COLORS.text.secondary,
+    color: 'rgba(255,255,255,0.7)',
     fontSize: fontScale(14),
     marginTop: verticalScale(4),
   },
@@ -195,17 +202,20 @@ const styles = StyleSheet.create({
   profileButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.COLORS.background.paper,
+    backgroundColor: 'rgba(0,0,0,0.3)',
     padding: moderateScale(8),
     borderRadius: 8,
   },
   profileText: {
-    color: theme.COLORS.text.primary,
+    color: 'white',
     marginRight: horizontalScale(4),
   },
   section: {
     padding: horizontalScale(16),
     marginBottom: verticalScale(16),
+    backgroundColor: 'rgba(0,0,0,0.3)', // Darker, almost transparent black
+    borderRadius: 12,
+    marginHorizontal: horizontalScale(16),
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -213,13 +223,13 @@ const styles = StyleSheet.create({
     marginBottom: verticalScale(8),
   },
   sectionTitle: {
-    color: theme.COLORS.text.primary,
+    color: 'white',
     fontSize: fontScale(20),
-    ...theme.FONTS.bold,
+    fontWeight: 'bold',
     marginLeft: horizontalScale(8),
   },
   sectionSubtitle: {
-    color: theme.COLORS.text.secondary,
+    color: 'rgba(255,255,255,0.7)',
     fontSize: fontScale(14),
     marginBottom: verticalScale(16),
   },
@@ -227,7 +237,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: theme.COLORS.background.paper,
+    backgroundColor: 'rgba(0,0,0,0.2)', // Darker background for event items
     padding: moderateScale(16),
     borderRadius: 8,
     marginBottom: verticalScale(8),
@@ -236,12 +246,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   eventTitle: {
-    color: theme.COLORS.text.primary,
+    color: 'white',
     fontSize: fontScale(16),
-    ...theme.FONTS.medium,
+    fontWeight: '500',
   },
   eventDate: {
-    color: theme.COLORS.text.secondary,
+    color: 'rgba(255,255,255,0.7)',
     fontSize: fontScale(14),
     marginTop: verticalScale(4),
   },
@@ -251,7 +261,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   meeting: {
-    backgroundColor: theme.COLORS.primary.main,
+    backgroundColor: '#1C8D3A',
   },
   deadline: {
     backgroundColor: '#FF4B4B',
@@ -260,9 +270,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#4B7BFF',
   },
   eventBadgeText: {
-    color: theme.COLORS.text.primary,
+    color: 'white',
     fontSize: fontScale(12),
-    ...theme.FONTS.medium,
+    fontWeight: '500',
   },
   viewMoreButton: {
     flexDirection: 'row',
@@ -271,15 +281,15 @@ const styles = StyleSheet.create({
     marginTop: verticalScale(16),
   },
   viewMoreText: {
-    color: theme.COLORS.primary.main,
+    color: '#1C8D3A',
     fontSize: fontScale(16),
-    ...theme.FONTS.medium,
+    fontWeight: '500',
     marginRight: horizontalScale(8),
   },
   chatItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.COLORS.background.paper,
+    backgroundColor: 'rgba(0,0,0,0.2)', // Darker background for chat items
     padding: moderateScale(16),
     borderRadius: 8,
     marginBottom: verticalScale(8),
@@ -289,26 +299,26 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   chatTitle: {
-    color: theme.COLORS.text.primary,
+    color: 'white',
     fontSize: fontScale(16),
-    ...theme.FONTS.medium,
+    fontWeight: '500',
   },
   chatMessage: {
-    color: theme.COLORS.text.secondary,
+    color: 'rgba(255,255,255,0.7)',
     fontSize: fontScale(14),
     marginTop: verticalScale(4),
   },
   openChatButton: {
-    backgroundColor: theme.COLORS.primary.main,
+    backgroundColor: '#1C8D3A',
     padding: moderateScale(16),
     borderRadius: 8,
     alignItems: 'center',
     marginTop: verticalScale(16),
   },
   openChatText: {
-    color: theme.COLORS.text.primary,
+    color: 'white',
     fontSize: fontScale(16),
-    ...theme.FONTS.medium,
+    fontWeight: '500',
   },
   quickActionsGrid: {
     flexDirection: 'row',
@@ -318,16 +328,16 @@ const styles = StyleSheet.create({
   },
   quickActionButton: {
     width: '48%',
-    backgroundColor: theme.COLORS.background.paper,
+    backgroundColor: 'rgba(0,0,0,0.2)', // Darker background for quick action buttons
     padding: moderateScale(16),
     borderRadius: 8,
     alignItems: 'center',
     marginBottom: verticalScale(16),
   },
   quickActionText: {
-    color: theme.COLORS.text.primary,
+    color: 'white',
     fontSize: fontScale(14),
-    ...theme.FONTS.medium,
+    fontWeight: '500',
     marginTop: verticalScale(8),
   },
-}); 
+});

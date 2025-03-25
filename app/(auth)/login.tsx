@@ -12,7 +12,6 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Link, router } from 'expo-router';
 import theme from '../../constants/theme';
 import { horizontalScale, verticalScale, moderateScale, fontScale } from '../../utils/responsive';
 import { useAuth } from '../../contexts/AuthContext';
@@ -43,6 +42,7 @@ export default function LoginScreen() {
       });
 
       const data = await response.json();
+      console.log(data);
 
       if (!response.ok) {
         throw new Error(data.message || 'Login failed');
@@ -132,15 +132,6 @@ export default function LoginScreen() {
             <TouchableOpacity style={styles.forgotPassword}>
               <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
             </TouchableOpacity>
-
-            {/* Register Link */}
-            <View style={styles.registerContainer}>
-              <Text style={styles.registerText}>Don't have an account?  </Text>
-              
-                <TouchableOpacity>
-                  <Text style={styles.registerLink} onPress={() => router.push('/')}>Sign Up</Text>
-                </TouchableOpacity>
-            </View>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -232,19 +223,5 @@ const styles = StyleSheet.create({
   forgotPasswordText: {
     color: theme.COLORS.primary.main,
     fontSize: fontScale(14),
-  },
-  registerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  registerText: {
-    color: theme.COLORS.text.secondary,
-    fontSize: fontScale(14),
-  },
-  registerLink: {
-    color: theme.COLORS.primary.main,
-    fontSize: fontScale(14),
-    ...theme.FONTS.medium,
   },
 }); 
