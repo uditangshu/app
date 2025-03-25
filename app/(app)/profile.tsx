@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,11 +7,22 @@ import {
   TouchableOpacity,
   Image,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../../constants/theme';
 import { horizontalScale, verticalScale, moderateScale, fontScale } from '../../utils/responsive';
 import { useAuth } from '../../contexts/AuthContext';
+// import AsyncStorage from '@react-native-async-storage/async-storage';
+
+interface EmployeeProfile {
+  employee_id: string;
+  name: string;
+  email: string;
+  role: string;
+  manager_id: string;
+  is_blocked: boolean;
+}
 
 interface ProfileMenuItem {
   icon: string;
@@ -54,7 +65,38 @@ const profileMenuItems: ProfileMenuItem[] = [
 ];
 
 export default function ProfileScreen() {
-  const { logout, user } = useAuth();
+  const { logout, accessToken } = useAuth();
+  const [profile, setProfile] = useState<EmployeeProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchProfile = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(
+        'https://backend-deployment-792.as.r.appspot.com/employee/profile',
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch profile');
+      }
+
+      const data = await response.json();
+      setProfile(data);
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -64,13 +106,57 @@ export default function ProfileScreen() {
     }
   };
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={theme.COLORS.primary.main} />
+      </View>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Failed to load profile data</Text>
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
         {/* Profile Header */}
         <View style={styles.header}>
           <View style={styles.circleContainer}>
-            <Text style={styles.employeeId}>{user?.employee_id || 'N/A'}</Text>
+            <Text style={styles.employeeId}>{profile.employee_id}</Text>
+          </View>
+        </View>
+
+        {/* Profile Information */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="person-outline" size={24} color="white" />
+            <Text style={styles.sectionTitle}>Profile Information</Text>
+          </View>
+          <View style={styles.profileInfo}>
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Employee ID</Text>
+              <Text style={styles.value}>{profile.employee_id}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Email</Text>
+              <Text style={styles.value}>{profile.email}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Role</Text>
+              <Text style={styles.value}>{profile.role}</Text>
+            </View>
+            {profile.manager_id && (
+              <View style={styles.infoRow}>
+                <Text style={styles.label}>Manager ID</Text>
+                <Text style={styles.value}>{profile.manager_id}</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -119,6 +205,20 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    color: theme.COLORS.error,
+    fontSize: fontScale(16),
+  },
   header: {
     alignItems: 'center',
     padding: horizontalScale(16),
@@ -137,6 +237,43 @@ const styles = StyleSheet.create({
     color: theme.COLORS.background.paper,
     fontSize: fontScale(20),
     ...theme.FONTS.bold,
+  },
+  section: {
+    padding: horizontalScale(16),
+    marginBottom: verticalScale(16),
+    backgroundColor: 'rgba(28, 141, 58, 0.1)',
+    borderRadius: 12,
+    marginHorizontal: horizontalScale(16),
+    borderWidth: 1,
+    borderColor: 'rgba(28, 141, 58, 0.2)',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: verticalScale(16),
+  },
+  sectionTitle: {
+    color: theme.COLORS.text.primary,
+    fontSize: fontScale(20),
+    ...theme.FONTS.bold,
+    marginLeft: horizontalScale(8),
+  },
+  profileInfo: {
+    gap: verticalScale(12),
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  label: {
+    color: theme.COLORS.text.secondary,
+    fontSize: fontScale(14),
+  },
+  value: {
+    color: theme.COLORS.text.primary,
+    fontSize: fontScale(14),
+    ...theme.FONTS.medium,
   },
   menuContainer: {
     padding: horizontalScale(16),

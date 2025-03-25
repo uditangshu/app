@@ -50,11 +50,11 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen
-        name="chat"
+        name="statistics"
         options={{
-          title: 'Chat',
+          title: 'Statistics',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="chatbubble-outline" size={size} color={color} />
+            <Ionicons name="stats-chart-outline" size={size} color={color} />
           ),
         }}
       />

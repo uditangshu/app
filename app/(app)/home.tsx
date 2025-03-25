@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,11 +8,14 @@ import {
   SafeAreaView,
   Platform,
   ViewStyle,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import theme from '../../constants/theme';
 import { horizontalScale, verticalScale, moderateScale, fontScale } from '../../utils/responsive';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface EventItem {
   id: string;
@@ -22,8 +25,18 @@ interface EventItem {
 }
 
 interface ChatItem {
-  department: string;
-  message: string;
+  chat_id: string;
+  last_message: string;
+  last_message_time: string;
+  unread_count: number;
+  total_messages: number;
+  chat_mode: string;
+  is_escalated: boolean;
+}
+
+interface ChatResponse {
+  chats: ChatItem[];
+  total_chats: number;
 }
 
 const events: EventItem[] = [
@@ -32,13 +45,56 @@ const events: EventItem[] = [
   { id: '3', title: 'Training Session', date: '2023-03-30 2:00 PM', type: 'Training' },
 ];
 
-const chats: ChatItem[] = [
-  { department: 'HR Department', message: 'About leave policy...' },
-  { department: 'Tech Support', message: 'Laptop issue resolution...' },
-  { department: 'Sales Team', message: 'Discussion on new product launch...' },
-];
-
 export default function HomeScreen() {
+  const router = useRouter();
+  const { accessToken } = useAuth();
+  const [chats, setChats] = useState<ChatItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const PAGE_SIZE = 3;
+
+  const fetchChats = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(
+        `https://backend-deployment-792.as.r.appspot.com/employee/chats?page=${page}&limit=${PAGE_SIZE}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch chats');
+      }
+
+      const data: ChatResponse = await response.json();
+      setChats(prevChats => page === 1 ? data.chats : [...prevChats, ...data.chats]);
+      setHasMore(data.chats.length === PAGE_SIZE);
+    } catch (error) {
+      console.error('Error fetching chats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchChats();
+  }, [page]);
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const loadMore = () => {
+    if (!loading && hasMore) {
+      setPage(prev => prev + 1);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
@@ -59,10 +115,10 @@ export default function HomeScreen() {
                   <Text style={styles.badgeText}>3</Text>
                 </View>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.profileButton}>
+              {/* <TouchableOpacity style={styles.profileButton}>
                 <Text style={styles.profileText}>EMP2001</Text>
                 <Ionicons name="chevron-down" size={20} color="white" />
-              </TouchableOpacity>
+              </TouchableOpacity> */}
             </View>
           </View>
 
@@ -100,48 +156,67 @@ export default function HomeScreen() {
             </View>
             <Text style={styles.sectionSubtitle}>Your recent conversations</Text>
 
-            {chats.map((chat, index) => (
-              <TouchableOpacity key={index} style={styles.chatItem}>
-                <Ionicons name="chatbubble-outline" size={24} color="#1C8D3A" />
-                <View style={styles.chatInfo}>
-                  <Text style={styles.chatTitle}>{chat.department}</Text>
-                  <Text style={styles.chatMessage}>{chat.message}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+            {loading && page === 1 ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={theme.COLORS.primary.main} />
+              </View>
+            ) : (
+              <>
+                {chats.map((chat, index) => (
+                  <TouchableOpacity 
+                    key={chat.chat_id} 
+                    style={styles.chatItem}
+                    onPress={() => router.push(`/view-chat?chatId=${encodeURIComponent(chat.chat_id)}`)}
+                  >
+                    <View style={styles.chatIconContainer}>
+                      <Ionicons 
+                        name={chat.is_escalated ? "alert-circle" : "chatbubble-outline"} 
+                        size={24} 
+                        color={chat.is_escalated ? theme.COLORS.error : theme.COLORS.primary.main} 
+                      />
+                    </View>
+                    <View style={styles.chatInfo}>
+                      <View style={styles.chatHeader}>
+                        <Text style={styles.chatTitle}>Chat #{chat.chat_id}</Text>
+                        <Text style={styles.chatTime}>{formatDate(chat.last_message_time)}</Text>
+                      </View>
+                      <Text style={styles.chatMessage} numberOfLines={1}>
+                        {chat.last_message}
+                      </Text>
+                      {chat.unread_count > 0 && (
+                        <View style={styles.unreadBadge}>
+                          <Text style={styles.unreadCount}>{chat.unread_count}</Text>
+                        </View>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                ))}
 
-            <TouchableOpacity style={styles.openChatButton}>
-              <Text style={styles.openChatText}>Open Chat</Text>
-            </TouchableOpacity>
+                {hasMore && (
+                  <TouchableOpacity 
+                    style={styles.loadMoreButton} 
+                    onPress={loadMore}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <ActivityIndicator size="small" color="white" />
+                    ) : (
+                      <Text style={styles.loadMoreText}>Load More</Text>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </>
+            )}
           </View>
 
-          {/* Quick Actions Section */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="flash-outline" size={24} color="white" />
-              <Text style={styles.sectionTitle}>Quick Actions</Text>
-            </View>
-            <Text style={styles.sectionSubtitle}>Common tasks and resources</Text>
-
-            <View style={styles.quickActionsGrid}>
-              <TouchableOpacity style={styles.quickActionButton}>
-                <Ionicons name="document-text-outline" size={24} color="white" />
-                <Text style={styles.quickActionText}>Documents</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.quickActionButton}>
-                <Ionicons name="calendar-outline" size={24} color="white" />
-                <Text style={styles.quickActionText}>Schedule</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.quickActionButton}>
-                <Ionicons name="notifications-outline" size={24} color="white" />
-                <Text style={styles.quickActionText}>Notifications</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.quickActionButton}>
-                <Ionicons name="chatbubbles-outline" size={24} color="white" />
-                <Text style={styles.quickActionText}>Messages</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          {/* Chat Button */}
+          <TouchableOpacity 
+            style={styles.chatButton}
+            onPress={() => router.push('/chat')}
+          >
+            <Ionicons name="chatbubbles-outline" size={24} color="white" />
+            <Text style={styles.chatButtonText}>Open Chat</Text>
+          </TouchableOpacity>
         </ScrollView>
       </LinearGradient>
     </SafeAreaView>
@@ -213,7 +288,7 @@ const styles = StyleSheet.create({
   section: {
     padding: horizontalScale(16),
     marginBottom: verticalScale(16),
-    backgroundColor: 'rgba(0,0,0,0.3)', // Darker, almost transparent black
+    backgroundColor: 'rgba(0,0,0,0.8)', // Darker background for sections
     borderRadius: 12,
     marginHorizontal: horizontalScale(16),
   },
@@ -237,7 +312,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.2)', // Darker background for event items
+    backgroundColor: 'rgba(0,0,0,0.6)', // Darker background for event items
     padding: moderateScale(16),
     borderRadius: 8,
     marginBottom: verticalScale(8),
@@ -289,7 +364,7 @@ const styles = StyleSheet.create({
   chatItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.2)', // Darker background for chat items
+    backgroundColor: 'rgba(0,0,0,0.6)', // Darker background for chat items
     padding: moderateScale(16),
     borderRadius: 8,
     marginBottom: verticalScale(8),
@@ -308,16 +383,56 @@ const styles = StyleSheet.create({
     fontSize: fontScale(14),
     marginTop: verticalScale(4),
   },
-  openChatButton: {
-    backgroundColor: '#1C8D3A',
-    padding: moderateScale(16),
+  chatIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(28, 141, 58, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: horizontalScale(12),
+  },
+  chatHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: verticalScale(4),
+  },
+  chatTime: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: fontScale(12),
+  },
+  unreadBadge: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    backgroundColor: theme.COLORS.primary.main,
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+  unreadCount: {
+    color: 'white',
+    fontSize: fontScale(12),
+    fontWeight: 'bold',
+  },
+  loadingContainer: {
+    padding: verticalScale(20),
+    alignItems: 'center',
+  },
+  loadMoreButton: {
+    backgroundColor: 'rgba(28, 141, 58, 0.2)',
+    padding: moderateScale(12),
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: verticalScale(16),
+    marginTop: verticalScale(8),
   },
-  openChatText: {
+  loadMoreText: {
     color: 'white',
-    fontSize: fontScale(16),
+    fontSize: fontScale(14),
     fontWeight: '500',
   },
   quickActionsGrid: {
@@ -328,7 +443,7 @@ const styles = StyleSheet.create({
   },
   quickActionButton: {
     width: '48%',
-    backgroundColor: 'rgba(0,0,0,0.2)', // Darker background for quick action buttons
+    backgroundColor: 'rgba(0,0,0,0.6)', // Darker background for quick action buttons
     padding: moderateScale(16),
     borderRadius: 8,
     alignItems: 'center',
@@ -339,5 +454,22 @@ const styles = StyleSheet.create({
     fontSize: fontScale(14),
     fontWeight: '500',
     marginTop: verticalScale(8),
+  },
+  chatButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.COLORS.primary.main,
+    padding: moderateScale(16),
+    borderRadius: 8,
+    margin: horizontalScale(16),
+    marginTop: verticalScale(24),
+    marginBottom: verticalScale(32),
+  },
+  chatButtonText: {
+    color: 'white',
+    fontSize: fontScale(16),
+    ...theme.FONTS.medium,
+    marginLeft: horizontalScale(8),
   },
 });
