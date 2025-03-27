@@ -9,7 +9,7 @@
     "web": "expo start --web",
     "test": "jest --watchAll",
     "build": "expo export -p web",
-    "build:prod": "expo export -p web"
+    "vercel-build": "expo export -p web && mv web-build dist"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.0.0",
