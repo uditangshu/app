@@ -16,7 +16,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import theme from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { lightTheme, darkTheme } from '../../constants/theme';
 import { horizontalScale, verticalScale, moderateScale, fontScale } from '../../utils/responsive';
 import { useAuth } from '../../contexts/AuthContext';
 import ChatScreen from '../modals/chat';
@@ -52,6 +53,8 @@ const events: EventItem[] = [
 export default function HomeScreen() {
   const router = useRouter();
   const { accessToken } = useAuth();
+  const { isDarkMode } = useTheme();
+  const theme = isDarkMode ? darkTheme : lightTheme;
   const [chats, setChats] = useState<ChatItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -169,7 +172,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={['#1C8D3A', '#165C27', '#0A3814']}
+        colors={isDarkMode ? ['#1C1C1E', '#2C2C2E', '#000000'] : ['#1C8D3A', '#165C27', '#0A3814']}
         style={styles.gradientBackground}
       >
         <ScrollView style={styles.scrollView}>
@@ -181,48 +184,52 @@ export default function HomeScreen() {
             </View>
             <View style={styles.headerRight}>
               <TouchableOpacity style={styles.notificationButton}>
-                <Ionicons name="notifications-outline" size={24} color="white" />
-                <View style={styles.notificationBadge}>
+                <Ionicons name="notifications-outline" size={24} color={theme.COLORS.text.primary} />
+                <View style={[styles.notificationBadge, { backgroundColor: theme.COLORS.error }]}>
                   <Text style={styles.badgeText}>3</Text>
                 </View>
               </TouchableOpacity>
-              
             </View>
           </View>
 
           {/* Upcoming Events Section */}
-          <View style={styles.section}>
+          <View style={[styles.section, { backgroundColor: theme.COLORS.background.paper }]}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="calendar-outline" size={24} color="white" />
-              <Text style={styles.sectionTitle}>Upcoming Events</Text>
+              <Ionicons name="calendar-outline" size={24} color={theme.COLORS.text.primary} />
+              <Text style={[styles.sectionTitle, { color: theme.COLORS.text.primary }]}>Upcoming Events</Text>
             </View>
-            <Text style={styles.sectionSubtitle}>Your scheduled events and deadlines</Text>
-            
-            {events.map((event) => (
-              <View key={event.id} style={styles.eventItem}>
-                <View style={styles.eventInfo}>
-                  <Text style={styles.eventTitle}>{event.title}</Text>
-                  <Text style={styles.eventDate}>{event.date}</Text>
+            <View style={styles.eventsList}>
+              {events.map((event) => (
+                <View key={event.id} style={[styles.eventItem, { backgroundColor: theme.COLORS.background.elevated }]}>
+                  <View style={[styles.eventIcon, { backgroundColor: `${theme.COLORS.primary.main}20` }]}>
+                    <Ionicons
+                      name={
+                        event.type === 'Meeting'
+                          ? 'people-outline'
+                          : event.type === 'Deadline'
+                          ? 'flag-outline'
+                          : 'school-outline'
+                      }
+                      size={24}
+                      color={theme.COLORS.primary.main}
+                    />
+                  </View>
+                  <View style={styles.eventInfo}>
+                    <Text style={[styles.eventTitle, { color: theme.COLORS.text.primary }]}>{event.title}</Text>
+                    <Text style={[styles.eventDate, { color: theme.COLORS.text.secondary }]}>{event.date}</Text>
+                  </View>
                 </View>
-                <View style={[styles.eventBadge, styles[event.type.toLowerCase() as keyof typeof styles] as ViewStyle]}>
-                  <Text style={styles.eventBadgeText}>{event.type}</Text>
-                </View>
-              </View>
-            ))}
-
-            <TouchableOpacity style={styles.viewMoreButton}>
-              <Text style={styles.viewMoreText}>View Calendar</Text>
-              <Ionicons name="arrow-forward" size={20} color="#1C8D3A" />
-            </TouchableOpacity>
+              ))}
+            </View>
           </View>
 
           {/* Recent Chats Section */}
-          <View style={styles.section}>
+          <View style={[styles.section, { backgroundColor: theme.COLORS.background.paper }]}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="chatbubbles-outline" size={24} color="white" />
-              <Text style={styles.sectionTitle}>Recent Chats</Text>
+              <Ionicons name="chatbubbles-outline" size={24} color={theme.COLORS.text.primary} />
+              <Text style={[styles.sectionTitle, { color: theme.COLORS.text.primary }]}>Recent Chats</Text>
             </View>
-            <Text style={styles.sectionSubtitle}>Your recent conversations</Text>
+            <Text style={[styles.sectionSubtitle, { color: theme.COLORS.text.secondary }]}>Your recent conversations</Text>
 
             {loading && page === 1 ? (
               <View style={styles.loadingContainer}>
@@ -233,7 +240,7 @@ export default function HomeScreen() {
                 {chats.map((chat, index) => (
                   <TouchableOpacity 
                     key={chat.chat_id} 
-                    style={styles.chatItem}
+                    style={[styles.chatItem, { backgroundColor: theme.COLORS.background.elevated }]}
                     onPress={() => showChat(chat.chat_id)}
                   >
                     <View style={styles.chatIconContainer}>
@@ -245,47 +252,28 @@ export default function HomeScreen() {
                     </View>
                     <View style={styles.chatInfo}>
                       <View style={styles.chatHeader}>
-                        <Text style={styles.chatTitle}>Chat #{chat.chat_id}</Text>
-                        <Text style={styles.chatTime}>{formatDate(chat.last_message_time)}</Text>
+                        <Text style={[styles.chatTitle, { color: theme.COLORS.text.primary }]}>Chat #{chat.chat_id}</Text>
+                        <Text style={[styles.chatTime, { color: theme.COLORS.text.secondary }]}>{formatDate(chat.last_message_time)}</Text>
                       </View>
-                      <Text style={styles.chatMessage} numberOfLines={1}>
+                      <Text style={[styles.chatMessage, { color: theme.COLORS.text.secondary }]} numberOfLines={2}>
                         {chat.last_message}
                       </Text>
-                      {chat.unread_count > 0 && (
-                        <View style={styles.unreadBadge}>
-                          <Text style={styles.unreadCount}>{chat.unread_count}</Text>
-                        </View>
-                      )}
                     </View>
                   </TouchableOpacity>
                 ))}
-
-                {hasMore && (
-                  <TouchableOpacity 
-                    style={styles.loadMoreButton} 
-                    onPress={loadMore}
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <ActivityIndicator size="small" color="white" />
-                    ) : (
-                      <Text style={styles.loadMoreText}>Load More</Text>
-                    )}
-                  </TouchableOpacity>
-                )}
               </>
             )}
           </View>
-
-          {/* Chat Button */}
-          <TouchableOpacity 
-            style={styles.chatButton}
-            onPress={() => showChat()}
-          >
-            <Ionicons name="chatbubbles-outline" size={24} color="white" />
-            <Text style={styles.chatButtonText}>Open Chat</Text>
-          </TouchableOpacity>
         </ScrollView>
+
+        {/* Chat Button */}
+        <TouchableOpacity
+          style={[styles.chatButton, { backgroundColor: theme.COLORS.primary.main }]}
+          onPress={() => showChat()}
+        >
+          <Ionicons name="chatbubble-ellipses-outline" size={24} color={theme.COLORS.text.primary} />
+          <Text style={[styles.chatButtonText, { color: theme.COLORS.text.primary }]}>Open Chat</Text>
+        </TouchableOpacity>
 
         {/* Chat Modal */}
         {isChatVisible && (
@@ -299,16 +287,17 @@ export default function HomeScreen() {
                   inputRange: [0, 1],
                   outputRange: [0, Dimensions.get('window').height],
                 }),
+                backgroundColor: theme.COLORS.background.main,
               },
             ]}
             {...panResponder.panHandlers}
           >
-            {/* <View style={styles.chatHeader}>
+            <View style={[styles.chatHeader, { backgroundColor: theme.COLORS.background.elevated }]}>
               <View style={styles.chatHandle} />
               <TouchableOpacity onPress={dismissChat} style={styles.closeButton}>
                 <Ionicons name="close" size={24} color={theme.COLORS.text.primary} />
               </TouchableOpacity>
-            </View> */}
+            </View>
             <ChatScreen 
               onClose={dismissChat} 
               initialChatId={selectedChatId} 
@@ -335,19 +324,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: horizontalScale(16),
-    paddingTop: Platform.OS === 'android' ? verticalScale(40) : verticalScale(16),
-    backgroundColor: 'transparent',
+    padding: moderateScale(24),
   },
   welcomeText: {
-    color: 'white',
     fontSize: fontScale(24),
-    fontWeight: 'bold',
+    fontWeight: "700",
+    marginBottom: verticalScale(4),
   },
   subtitleText: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: fontScale(14),
-    marginTop: verticalScale(4),
+    fontSize: fontScale(16),
   },
   headerRight: {
     flexDirection: 'row',
@@ -355,244 +340,152 @@ const styles = StyleSheet.create({
   },
   notificationButton: {
     position: 'relative',
-    marginRight: horizontalScale(16),
+    padding: moderateScale(8),
   },
   notificationBadge: {
     position: 'absolute',
-    top: -5,
-    right: -5,
-    backgroundColor: 'red',
-    borderRadius: 10,
-    width: 20,
+    top: 0,
+    right: 0,
+    backgroundColor: '#FF3B30',
+    borderRadius: 12,
+    minWidth: 20,
     height: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: horizontalScale(6),
   },
   badgeText: {
     color: 'white',
     fontSize: fontScale(12),
-  },
-  profileButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    padding: moderateScale(8),
-    borderRadius: 8,
-  },
-  profileText: {
-    color: 'white',
-    marginRight: horizontalScale(4),
+    fontWeight: "700",
   },
   section: {
-    padding: horizontalScale(16),
-    marginBottom: verticalScale(16),
-    backgroundColor: 'rgba(0,0,0,0.8)', // Darker background for sections
+    margin: moderateScale(16),
+    padding: moderateScale(16),
     borderRadius: 12,
-    marginHorizontal: horizontalScale(16),
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: verticalScale(8),
+    marginBottom: verticalScale(16),
   },
   sectionTitle: {
-    color: 'white',
     fontSize: fontScale(20),
-    fontWeight: 'bold',
-    marginLeft: horizontalScale(8),
+    fontWeight: "700",
+    marginLeft: horizontalScale(12),
   },
   sectionSubtitle: {
-    color: 'rgba(255,255,255,0.7)',
     fontSize: fontScale(14),
     marginBottom: verticalScale(16),
   },
+  eventsList: {
+    marginTop: verticalScale(8),
+  },
   eventItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)', // Darker background for event items
-    padding: moderateScale(16),
+    padding: moderateScale(12),
     borderRadius: 8,
     marginBottom: verticalScale(8),
+  },
+  eventIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: horizontalScale(12),
   },
   eventInfo: {
     flex: 1,
   },
   eventTitle: {
-    color: 'white',
     fontSize: fontScale(16),
-    fontWeight: '500',
+    fontWeight: "500",
+    marginBottom: verticalScale(4),
   },
   eventDate: {
-    color: 'rgba(255,255,255,0.7)',
     fontSize: fontScale(14),
-    marginTop: verticalScale(4),
-  },
-  eventBadge: {
-    paddingHorizontal: horizontalScale(12),
-    paddingVertical: verticalScale(4),
-    borderRadius: 16,
-  },
-  meeting: {
-    backgroundColor: '#1C8D3A',
-  },
-  deadline: {
-    backgroundColor: '#FF4B4B',
-  },
-  training: {
-    backgroundColor: '#4B7BFF',
-  },
-  eventBadgeText: {
-    color: 'white',
-    fontSize: fontScale(12),
-    fontWeight: '500',
-  },
-  viewMoreButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: verticalScale(16),
-  },
-  viewMoreText: {
-    color: '#1C8D3A',
-    fontSize: fontScale(16),
-    fontWeight: '500',
-    marginRight: horizontalScale(8),
   },
   chatItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)', // Darker background for chat items
-    padding: moderateScale(16),
+    padding: moderateScale(12),
     borderRadius: 8,
     marginBottom: verticalScale(8),
-  },
-  chatInfo: {
-    marginLeft: horizontalScale(12),
-    flex: 1,
-  },
-  chatTitle: {
-    color: 'white',
-    fontSize: fontScale(16),
-    fontWeight: '500',
-  },
-  chatMessage: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: fontScale(14),
-    marginTop: verticalScale(4),
   },
   chatIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(28, 141, 58, 0.1)',
+    backgroundColor: 'rgba(28, 141, 58, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: horizontalScale(12),
   },
+  chatInfo: {
+    flex: 1,
+  },
   chatHeader: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: moderateScale(16),
-    borderBottomWidth: 1,
-    borderBottomColor: theme.COLORS.border.main,
+    marginBottom: verticalScale(4),
+  },
+  chatTitle: {
+    fontSize: fontScale(16),
+    fontWeight: "500",
   },
   chatTime: {
-    color: 'rgba(255,255,255,0.5)',
     fontSize: fontScale(12),
   },
-  unreadBadge: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    backgroundColor: theme.COLORS.primary.main,
-    borderRadius: 12,
-    minWidth: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-  },
-  unreadCount: {
-    color: 'white',
-    fontSize: fontScale(12),
-    fontWeight: 'bold',
-  },
-  loadingContainer: {
-    padding: verticalScale(20),
-    alignItems: 'center',
-  },
-  loadMoreButton: {
-    backgroundColor: 'rgba(28, 141, 58, 0.2)',
-    padding: moderateScale(12),
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: verticalScale(8),
-  },
-  loadMoreText: {
-    color: 'white',
+  chatMessage: {
     fontSize: fontScale(14),
-    fontWeight: '500',
-  },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginTop: verticalScale(8),
-  },
-  quickActionButton: {
-    width: '48%',
-    backgroundColor: 'rgba(0,0,0,0.6)', // Darker background for quick action buttons
-    padding: moderateScale(16),
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: verticalScale(16),
-  },
-  quickActionText: {
-    color: 'white',
-    fontSize: fontScale(14),
-    fontWeight: '500',
-    marginTop: verticalScale(8),
   },
   chatButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.COLORS.primary.main,
+    position: 'absolute',
+    bottom: verticalScale(24),
+    right: horizontalScale(24),
     padding: moderateScale(16),
-    borderRadius: 8,
-    margin: horizontalScale(16),
-    marginTop: verticalScale(24),
-    marginBottom: verticalScale(32),
+    borderRadius: 30,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   chatButtonText: {
-    color: 'white',
     fontSize: fontScale(16),
-    ...theme.FONTS.medium,
+    fontWeight: "500",
     marginLeft: horizontalScale(8),
   },
   chatModal: {
     position: 'absolute',
-    top: 0,
+    bottom: 0,
     left: 0,
     right: 0,
-    bottom: 0,
-    backgroundColor: theme.COLORS.border.main,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    overflow: 'hidden',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   chatHandle: {
     width: horizontalScale(40),
     height: verticalScale(4),
-    backgroundColor: theme.COLORS.border.main,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
     borderRadius: 2,
-    marginBottom: verticalScale(8),
   },
   closeButton: {
     position: 'absolute',
     right: horizontalScale(16),
-    top: verticalScale(16),
+  },
+  loadingContainer: {
+    padding: verticalScale(20),
+    alignItems: 'center',
   },
 });

@@ -206,4 +206,84 @@ export const theme: Theme = {
   },
 };
 
+export const lightTheme = {
+  COLORS: {
+    primary: {
+      main: '#1C8D3A',
+      light: '#4DA3FF',
+      dark: '#165C27',
+    },
+    background: {
+      main: '#FFFFFF',
+      paper: '#F5F5F5',
+      elevated: '#FFFFFF',
+      default: '#FFFFFF',
+    },
+    text: {
+      primary: '#000000',
+      secondary: '#666666',
+    },
+    border: '#E0E0E0',
+    error: '#FF3B30',
+  },
+  FONTS: {
+    regular: {
+      fontFamily: 'System',
+      fontWeight: '400' as const,
+    },
+    medium: {
+      fontFamily: 'System',
+      fontWeight: '500' as const,
+    },
+    semibold: {
+      fontFamily: 'System',
+      fontWeight: '600' as const,
+    },
+    bold: {
+      fontFamily: 'System',
+      fontWeight: '700' as const,
+    },
+  },
+};
+
+export const darkTheme = {
+  COLORS: {
+    primary: {
+      main: '#1C8D3A',
+      light: '#4DA3FF',
+      dark: '#165C27',
+    },
+    background: {
+      main: '#000000',
+      paper: '#1C1C1E',
+      elevated: '#2C2C2E',
+      default: '#000000',
+    },
+    text: {
+      primary: '#FFFFFF',
+      secondary: '#8E8E93',
+    },
+    border: '#38383A',
+    error: '#FF453A',
+  },
+  FONTS: {
+    regular: {
+      fontFamily: 'System',
+      fontWeight: '400' as const,
+    },
+    medium: {
+      fontFamily: 'System',
+      fontWeight: '500' as const,
+    },
+    semibold: {
+      fontFamily: 'System',
+      fontWeight: '600' as const,
+    },
+    bold: {
+      fontFamily: 'System',
+      fontWeight: '700' as const,
+    },
+  },
+};
+
 export default theme; 

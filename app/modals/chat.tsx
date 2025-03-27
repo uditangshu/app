@@ -14,7 +14,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../../theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import { lightTheme, darkTheme } from '../../constants/theme';
 import { fontScale, horizontalScale, moderateScale, verticalScale } from '../../utils/scaling';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -54,6 +55,8 @@ interface ChatScreenProps {
 
 export default function ChatScreen({ onClose, initialChatId, isReadOnly = false }: ChatScreenProps) {
   const { accessToken, refreshAccessToken, logout } = useAuth();
+  const { isDarkMode } = useTheme();
+  const theme = isDarkMode ? darkTheme : lightTheme;
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -313,12 +316,12 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.COLORS.background.main }]}>
       {/* Sidebar */}
       {isSidebarOpen && (
-        <View style={styles.sidebar}>
-          <View style={styles.sidebarHeader}>
-            <Text style={styles.sidebarTitle}>Chat History</Text>
+        <View style={[styles.sidebar, { backgroundColor: theme.COLORS.background.elevated }]}>
+          <View style={[styles.sidebarHeader, { borderBottomColor: theme.COLORS.border }]}>
+            <Text style={[styles.sidebarTitle, { color: theme.COLORS.text.primary }]}>Chat History</Text>
             <TouchableOpacity onPress={toggleSidebar}>
               <Ionicons name="close" size={24} color={theme.COLORS.text.primary} />
             </TouchableOpacity>
@@ -334,11 +337,11 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
 
       {/* Main Chat UI */}
       <View style={styles.mainContent}>
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: theme.COLORS.background.elevated, borderBottomColor: theme.COLORS.border }]}>
           <TouchableOpacity onPress={toggleSidebar} style={styles.menuButton}>
             <Ionicons name="menu" size={24} color={theme.COLORS.text.primary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>
+          <Text style={[styles.headerTitle, { color: theme.COLORS.text.primary }]}>
             {selectedChatId ? `Chat #${selectedChatId}` : 'New Chat'}
           </Text>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
@@ -349,8 +352,8 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
         {!activeSession && !selectedChatId ? (
           <View style={styles.noSessionContainer}>
             <Ionicons name="calendar-outline" size={48} color={theme.COLORS.text.secondary} />
-            <Text style={styles.noSessionTitle}>No Active Session</Text>
-            <Text style={styles.noSessionText}>
+            <Text style={[styles.noSessionTitle, { color: theme.COLORS.text.primary }]}>No Active Session</Text>
+            <Text style={[styles.noSessionText, { color: theme.COLORS.text.secondary }]}>
               You don't have any scheduled chat sessions at the moment.
             </Text>
           </View>
@@ -370,9 +373,9 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.content}>
           {!isReadOnly && (
-            <View style={styles.inputContainer}>
+            <View style={[styles.inputContainer, { backgroundColor: theme.COLORS.background.elevated, borderTopColor: theme.COLORS.border }]}>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: theme.COLORS.background.main, color: theme.COLORS.text.primary }]}
                 value={inputText}
                 onChangeText={setInputText}
                 placeholder="Type your message..."
@@ -380,7 +383,7 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
                 multiline
               />
               <TouchableOpacity
-                style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
+                style={[styles.sendButton, { backgroundColor: theme.COLORS.background.main }, !inputText.trim() && styles.sendButtonDisabled]}
                 onPress={sendMessage}
                 disabled={!inputText.trim()}>
                 <Ionicons
@@ -400,7 +403,6 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.COLORS.background.main,
   },
   mainContent: {
     flex: 1,
@@ -410,8 +412,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: moderateScale(16),
     borderBottomWidth: 1,
-    borderBottomColor: theme.COLORS.border,
-    backgroundColor: theme.COLORS.background.elevated,
   },
   menuButton: {
     marginRight: horizontalScale(16),
@@ -421,8 +421,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: fontScale(20),
-    color: theme.COLORS.text.primary,
-    ...theme.FONTS.semibold,
+    fontWeight: "600",
   },
   sidebar: {
     position: 'absolute',
@@ -430,7 +429,6 @@ const styles = StyleSheet.create({
     left: 0,
     bottom: 0,
     width: Dimensions.get('window').width * 0.8,
-    backgroundColor: theme.COLORS.background.elevated,
     zIndex: 1000,
     elevation: 5,
     shadowColor: '#000',
@@ -444,12 +442,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: moderateScale(16),
     borderBottomWidth: 1,
-    borderBottomColor: theme.COLORS.border,
   },
   sidebarTitle: {
     fontSize: fontScale(20),
-    color: theme.COLORS.text.primary,
-    ...theme.FONTS.semibold,
+    fontWeight: "600",
   },
   chatHistoryList: {
     padding: moderateScale(16),
@@ -460,7 +456,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: moderateScale(12),
     borderBottomWidth: 1,
-    borderBottomColor: theme.COLORS.border,
   },
   chatHistoryContent: {
     flex: 1,
@@ -468,23 +463,20 @@ const styles = StyleSheet.create({
   },
   chatHistoryId: {
     fontSize: fontScale(16),
-    color: theme.COLORS.text.primary,
-    ...theme.FONTS.medium,
+    fontWeight: "500",
     marginBottom: verticalScale(4),
   },
   chatHistoryMessage: {
     fontSize: fontScale(14),
-    color: theme.COLORS.text.secondary,
-    ...theme.FONTS.regular,
+    fontWeight: "400",
   },
   chatHistoryTimestamp: {
     fontSize: fontScale(12),
-    color: theme.COLORS.text.secondary,
-    ...theme.FONTS.regular,
+    fontWeight: "400",
     marginTop: verticalScale(4),
   },
   unreadBadge: {
-    backgroundColor: theme.COLORS.primary.main,
+    backgroundColor: '#1C8D3A',
     borderRadius: 12,
     minWidth: 24,
     height: 24,
@@ -495,7 +487,7 @@ const styles = StyleSheet.create({
   unreadCount: {
     color: 'white',
     fontSize: fontScale(12),
-    ...theme.FONTS.medium,
+    fontWeight: "500",
   },
   messageList: {
     padding: moderateScale(16),
@@ -512,44 +504,37 @@ const styles = StyleSheet.create({
   },
   aiMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: theme.COLORS.background.elevated,
+    backgroundColor: '#F5F5F5',
   },
   messageText: {
-    color: theme.COLORS.text.primary,
     fontSize: fontScale(16),
-    ...theme.FONTS.regular,
+    fontWeight: "400",
   },
   timestamp: {
     fontSize: fontScale(12),
-    color: theme.COLORS.text.secondary,
     marginTop: verticalScale(4),
-    ...theme.FONTS.regular,
+    fontWeight: "400",
   },
   inputContainer: {
     flexDirection: 'row',
     padding: moderateScale(16),
-    backgroundColor: theme.COLORS.background.elevated,
     borderTopWidth: 1,
-    borderTopColor: theme.COLORS.border,
   },
   input: {
     flex: 1,
     minHeight: verticalScale(40),
     maxHeight: verticalScale(100),
-    backgroundColor: theme.COLORS.background.main,
     borderRadius: 20,
     paddingHorizontal: horizontalScale(16),
     paddingVertical: verticalScale(8),
     marginRight: horizontalScale(8),
-    color: theme.COLORS.text.primary,
     fontSize: fontScale(16),
-    ...theme.FONTS.regular,
+    fontWeight: "400",
   },
   sendButton: {
     width: horizontalScale(40),
     height: verticalScale(40),
     borderRadius: 20,
-    backgroundColor: theme.COLORS.background.main,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -560,7 +545,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.COLORS.background.main,
   },
   noSessionContainer: {
     flex: 1,
@@ -570,21 +554,19 @@ const styles = StyleSheet.create({
   },
   noSessionTitle: {
     fontSize: fontScale(20),
-    color: theme.COLORS.text.primary,
-    ...theme.FONTS.semibold,
+    fontWeight: "600",
     marginTop: verticalScale(16),
     marginBottom: verticalScale(8),
   },
   noSessionText: {
     fontSize: fontScale(16),
-    color: theme.COLORS.text.secondary,
     textAlign: 'center',
-    ...theme.FONTS.regular,
+    fontWeight: "400",
   },
   content: {
     flex: 1,
   },
   selectedChatItem: {
-    backgroundColor: theme.COLORS.background.main,
+    backgroundColor: '#FFFFFF',
   },
 }); 

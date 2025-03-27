@@ -9,7 +9,8 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import theme from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
+import theme, { lightTheme, darkTheme } from '../../constants/theme';
 import { horizontalScale, verticalScale, moderateScale, fontScale } from '../../utils/responsive';
 
 interface SettingItem {
@@ -22,93 +23,95 @@ interface SettingItem {
   onToggle?: (value: boolean) => void;
 }
 
-const settingsItems: SettingItem[] = [
-  {
-    icon: 'moon-outline',
-    title: 'Dark Mode',
-    subtitle: 'Toggle dark/light theme',
-    type: 'toggle',
-    value: true,
-    onToggle: () => {},
-  },
-  {
-    icon: 'notifications-outline',
-    title: 'Push Notifications',
-    subtitle: 'Receive app notifications',
-    type: 'toggle',
-    value: true,
-    onToggle: () => {},
-  },
-  {
-    icon: 'language-outline',
-    title: 'Language',
-    subtitle: 'Change app language',
-    type: 'select',
-    onPress: () => {},
-  },
-  {
-    icon: 'cloud-download-outline',
-    title: 'Data & Storage',
-    subtitle: 'Manage app data and storage',
-    type: 'action',
-    onPress: () => {},
-  },
-  {
-    icon: 'shield-checkmark-outline',
-    title: 'Privacy',
-    subtitle: 'Privacy settings and permissions',
-    type: 'action',
-    onPress: () => {},
-  },
-  {
-    icon: 'help-circle-outline',
-    title: 'Help & Support',
-    subtitle: 'Get help and contact support',
-    type: 'action',
-    onPress: () => {},
-  },
-  {
-    icon: 'information-circle-outline',
-    title: 'About',
-    subtitle: 'App version and information',
-    type: 'action',
-    onPress: () => {},
-  },
-];
-
 export default function SettingsScreen() {
-  const [settings, setSettings] = useState<SettingItem[]>(settingsItems);
+  const { isDarkMode, toggleTheme } = useTheme();
+  const theme = isDarkMode ? darkTheme : lightTheme;
+  const [settings, setSettings] = useState<SettingItem[]>([
+    {
+      icon: 'moon-outline',
+      title: 'Dark Mode',
+      subtitle: 'Toggle dark/light theme',
+      type: 'toggle',
+      value: isDarkMode,
+      onToggle: toggleTheme,
+    },
+    {
+      icon: 'notifications-outline',
+      title: 'Push Notifications',
+      subtitle: 'Receive app notifications',
+      type: 'toggle',
+      value: true,
+      onToggle: () => {},
+    },
+    {
+      icon: 'language-outline',
+      title: 'Language',
+      subtitle: 'Change app language',
+      type: 'select',
+      onPress: () => {},
+    },
+    {
+      icon: 'cloud-download-outline',
+      title: 'Data & Storage',
+      subtitle: 'Manage app data and storage',
+      type: 'action',
+      onPress: () => {},
+    },
+    {
+      icon: 'shield-checkmark-outline',
+      title: 'Privacy',
+      subtitle: 'Privacy settings and permissions',
+      type: 'action',
+      onPress: () => {},
+    },
+    {
+      icon: 'help-circle-outline',
+      title: 'Help & Support',
+      subtitle: 'Get help and contact support',
+      type: 'action',
+      onPress: () => {},
+    },
+    {
+      icon: 'information-circle-outline',
+      title: 'About',
+      subtitle: 'App version and information',
+      type: 'action',
+      onPress: () => {},
+    },
+  ]);
 
   const handleToggle = (index: number, value: boolean) => {
     const newSettings = [...settings];
     newSettings[index] = { ...newSettings[index], value };
     setSettings(newSettings);
-    settingsItems[index].onToggle?.(value);
+    if (newSettings[index].onToggle) {
+      newSettings[index].onToggle(value);
+    }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.COLORS.background.default }]}>
       <ScrollView style={styles.scrollView}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>App Settings</Text>
-          <Text style={styles.sectionSubtitle}>Customize your app experience</Text>
+          <Text style={[styles.sectionTitle, { color: theme.COLORS.text.primary }]}>App Settings</Text>
+          <Text style={[styles.sectionSubtitle, { color: theme.COLORS.text.secondary }]}>Customize your app experience</Text>
         </View>
 
         <View style={styles.menuContainer}>
           {settings.map((item, index) => (
             <TouchableOpacity
               key={index}
-              style={styles.menuItem}
+              style={[styles.menuItem, { backgroundColor: theme.COLORS.background.paper }]}
               onPress={() => item.type !== 'toggle' && item.onPress?.()}
             >
               <View style={styles.menuItemLeft}>
-                <View style={styles.iconContainer}>
+                <View style={[styles.iconContainer, { backgroundColor: `${theme.COLORS.primary.main}20` }]}>
                   <Ionicons name={item.icon as any} size={24} color={theme.COLORS.primary.main} />
                 </View>
                 <View style={styles.menuItemText}>
-                  <Text style={styles.menuItemTitle}>{item.title}</Text>
+                  <Text style={[styles.menuItemTitle, { color: theme.COLORS.text.primary }]}>{item.title}</Text>
                   {item.subtitle && (
-                    <Text style={styles.menuItemSubtitle}>{item.subtitle}</Text>
+                    <Text style={[styles.menuItemSubtitle, { color: theme.COLORS.text.secondary }]}>{item.subtitle}</Text>
                   )}
                 </View>
               </View>
@@ -128,8 +131,8 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.versionContainer}>
-          <Text style={styles.versionText}>Version 1.0.0</Text>
-          <Text style={styles.copyrightText}>© 2024 Your Company. All rights reserved.</Text>
+          <Text style={[styles.versionText, { color: theme.COLORS.text.secondary }]}>Version 1.0.0</Text>
+          <Text style={[styles.copyrightText, { color: theme.COLORS.text.secondary }]}>© 2024 Your Company. All rights reserved.</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -139,36 +142,31 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.COLORS.background.default,
   },
   scrollView: {
     flex: 1,
   },
   section: {
-    padding: horizontalScale(16),
-    paddingTop: verticalScale(24),
-    marginBottom: verticalScale(8),
+    padding: moderateScale(24),
   },
   sectionTitle: {
-    color: theme.COLORS.text.primary,
-    fontSize: fontScale(24),
-    ...theme.FONTS.bold,
-    marginBottom: verticalScale(4),
+    fontSize: fontScale(28),
+    fontWeight: "700",
+    marginBottom: verticalScale(8),
   },
   sectionSubtitle: {
-    color: theme.COLORS.text.secondary,
-    fontSize: fontScale(14),
+    fontSize: fontScale(16),
+    fontWeight: "400",
   },
   menuContainer: {
-    padding: horizontalScale(16),
+    paddingHorizontal: moderateScale(16),
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: theme.COLORS.background.paper,
     padding: moderateScale(16),
-    borderRadius: 8,
+    borderRadius: 12,
     marginBottom: verticalScale(8),
   },
   menuItemLeft: {
@@ -178,9 +176,8 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     width: horizontalScale(40),
-    height: horizontalScale(40),
-    borderRadius: horizontalScale(20),
-    backgroundColor: `${theme.COLORS.primary.main}20`,
+    height: verticalScale(40),
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: horizontalScale(12),
@@ -189,28 +186,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   menuItemTitle: {
-    color: theme.COLORS.text.primary,
     fontSize: fontScale(16),
-    ...theme.FONTS.medium,
+    fontWeight: "500",
     marginBottom: verticalScale(4),
   },
   menuItemSubtitle: {
-    color: theme.COLORS.text.secondary,
     fontSize: fontScale(14),
+    fontWeight: "400",
   },
   versionContainer: {
+    padding: moderateScale(24),
     alignItems: 'center',
-    padding: horizontalScale(16),
-    paddingTop: verticalScale(32),
-    paddingBottom: verticalScale(16),
   },
   versionText: {
-    color: theme.COLORS.text.secondary,
     fontSize: fontScale(14),
+    fontWeight: "400",
     marginBottom: verticalScale(4),
   },
   copyrightText: {
-    color: theme.COLORS.text.secondary,
     fontSize: fontScale(12),
+    fontWeight: "400",
   },
 }); 

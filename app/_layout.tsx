@@ -1,12 +1,16 @@
 import React from 'react';
 import { Stack, Redirect } from 'expo-router';
 import { AuthProvider } from '../contexts/AuthContext';
+import { ThemeProvider } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ActivityIndicator, View } from 'react-native';
-import theme from '../constants/theme';
+import { lightTheme, darkTheme } from '../constants/theme';
+import { useTheme } from '../contexts/ThemeContext';
 
 function RootLayoutNav() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { isDarkMode } = useTheme();
+  const theme = isDarkMode ? darkTheme : lightTheme;
 
   if (isLoading) {
     return (
@@ -35,8 +39,10 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <RootLayoutNav />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <RootLayoutNav />
+      </AuthProvider>
+    </ThemeProvider>
   );
 } 
