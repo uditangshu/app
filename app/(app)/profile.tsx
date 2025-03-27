@@ -10,10 +10,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { lightTheme, darkTheme } from '../../constants/theme';
+import theme from '../../constants/theme';
 import { horizontalScale, verticalScale, moderateScale, fontScale } from '../../utils/responsive';
 import { useAuth } from '../../contexts/AuthContext';
-import { useTheme } from '../../contexts/ThemeContext';
 // import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface EmployeeProfile {
@@ -66,28 +65,28 @@ const profileMenuItems: ProfileMenuItem[] = [
 ];
 
 export default function ProfileScreen() {
-  const { logout } = useAuth();
-  const { isDarkMode } = useTheme();
-  const theme = isDarkMode ? darkTheme : lightTheme;
+  const { logout, accessToken } = useAuth();
+  const [profile, setProfile] = useState<EmployeeProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<any>(null);
-
-  useEffect(() => {
-    fetchProfile();
-  }, []);
 
   const fetchProfile = async () => {
     try {
-      // Simulated profile data
-      const mockProfile = {
-        name: 'John Doe',
-        employeeId: 'EMP2001',
-        department: 'IT',
-        position: 'Software Engineer',
-        email: 'john.doe@company.com',
-        phone: '+1 234 567 8900',
-      };
-      setProfile(mockProfile);
+      setLoading(true);
+      const response = await fetch(
+        'https://backend-deployment-792.as.r.appspot.com/employee/profile',
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch profile');
+      }
+
+      const data = await response.json();
+      setProfile(data);
     } catch (error) {
       console.error('Error fetching profile:', error);
     } finally {
@@ -95,48 +94,21 @@ export default function ProfileScreen() {
     }
   };
 
-  const menuItems: ProfileMenuItem[] = [
-    {
-      icon: 'person-outline',
-      title: 'Personal Information',
-      subtitle: 'Update your personal details',
-      onPress: () => {},
-    },
-    {
-      icon: 'settings-outline',
-      title: 'Settings',
-      subtitle: 'App preferences and settings',
-      onPress: () => {},
-    },
-    {
-      icon: 'notifications-outline',
-      title: 'Notifications',
-      subtitle: 'Manage notification preferences',
-      onPress: () => {},
-    },
-    {
-      icon: 'shield-outline',
-      title: 'Privacy & Security',
-      subtitle: 'Manage your privacy settings',
-      onPress: () => {},
-    },
-    {
-      icon: 'help-circle-outline',
-      title: 'Help & Support',
-      subtitle: 'Get help and contact support',
-      onPress: () => {},
-    },
-    {
-      icon: 'log-out-outline',
-      title: 'Logout',
-      subtitle: 'Sign out of your account',
-      onPress: logout,
-    },
-  ];
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Error during logout:', error);
+    }
+  };
 
   if (loading) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: theme.COLORS.background.default }]}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.COLORS.primary.main} />
       </View>
     );
@@ -144,65 +116,66 @@ export default function ProfileScreen() {
 
   if (!profile) {
     return (
-      <View style={[styles.errorContainer, { backgroundColor: theme.COLORS.background.default }]}>
-        <Text style={[styles.errorText, { color: theme.COLORS.error }]}>Failed to load profile data</Text>
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Failed to load profile data</Text>
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.COLORS.background.default }]}>
+    <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
+        {/* Profile Header */}
         <View style={styles.header}>
-          <View style={[styles.avatarContainer, { backgroundColor: `${theme.COLORS.primary.main}20` }]}>
-            <Ionicons name="person" size={40} color={theme.COLORS.primary.main} />
+          <View style={styles.circleContainer}>
+            <Text style={styles.employeeId}>{profile.employee_id}</Text>
+          </View>
+        </View>
+
+        {/* Profile Information */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="person-outline" size={24} color="white" />
+            <Text style={styles.sectionTitle}>Profile Information</Text>
           </View>
           <View style={styles.profileInfo}>
-            <Text style={[styles.name, { color: theme.COLORS.text.primary }]}>{profile?.name}</Text>
-            <Text style={[styles.employeeId, { color: theme.COLORS.text.secondary }]}>{profile?.employeeId}</Text>
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Employee ID</Text>
+              <Text style={styles.value}>{profile.employee_id}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Email</Text>
+              <Text style={styles.value}>{profile.email}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Role</Text>
+              <Text style={styles.value}>{profile.role}</Text>
+            </View>
+            {profile.manager_id && (
+              <View style={styles.infoRow}>
+                <Text style={styles.label}>Manager ID</Text>
+                <Text style={styles.value}>{profile.manager_id}</Text>
+              </View>
+            )}
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.COLORS.text.primary }]}>Profile Information</Text>
-          <View style={[styles.infoCard, { backgroundColor: theme.COLORS.background.paper }]}>
-            <View style={styles.infoRow}>
-              <Text style={[styles.infoLabel, { color: theme.COLORS.text.secondary }]}>Department</Text>
-              <Text style={[styles.infoValue, { color: theme.COLORS.text.primary }]}>{profile?.department}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={[styles.infoLabel, { color: theme.COLORS.text.secondary }]}>Position</Text>
-              <Text style={[styles.infoValue, { color: theme.COLORS.text.primary }]}>{profile?.position}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={[styles.infoLabel, { color: theme.COLORS.text.secondary }]}>Email</Text>
-              <Text style={[styles.infoValue, { color: theme.COLORS.text.primary }]}>{profile?.email}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={[styles.infoLabel, { color: theme.COLORS.text.secondary }]}>Phone</Text>
-              <Text style={[styles.infoValue, { color: theme.COLORS.text.primary }]}>{profile?.phone}</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={[styles.sectionHeader, { borderBottomColor: theme.COLORS.border.main }]}>
-          <Text style={[styles.sectionTitle, { color: theme.COLORS.text.primary }]}>Menu</Text>
-        </View>
-        <View style={[styles.menuContainer, { backgroundColor: theme.COLORS.background.paper }]}>
-          {menuItems.map((item, index) => (
+        {/* Profile Menu */}
+        <View style={styles.menuContainer}>
+          {profileMenuItems.map((item, index) => (
             <TouchableOpacity
               key={index}
-              style={[styles.menuItem, { backgroundColor: theme.COLORS.background.paper }]}
+              style={styles.menuItem}
               onPress={item.onPress}
             >
               <View style={styles.menuItemLeft}>
-                <View style={[styles.iconContainer, { backgroundColor: `${theme.COLORS.primary.main}20` }]}>
+                <View style={styles.iconContainer}>
                   <Ionicons name={item.icon as any} size={24} color={theme.COLORS.primary.main} />
                 </View>
                 <View style={styles.menuItemText}>
-                  <Text style={[styles.menuItemTitle, { color: theme.COLORS.text.primary }]}>{item.title}</Text>
+                  <Text style={styles.menuItemTitle}>{item.title}</Text>
                   {item.subtitle && (
-                    <Text style={[styles.menuItemSubtitle, { color: theme.COLORS.text.secondary }]}>{item.subtitle}</Text>
+                    <Text style={styles.menuItemSubtitle}>{item.subtitle}</Text>
                   )}
                 </View>
               </View>
@@ -210,6 +183,15 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           ))}
         </View>
+
+        {/* Logout Button */}
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={handleLogout}
+        >
+          <Ionicons name="log-out-outline" size={24} color={theme.COLORS.error} />
+          <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -218,6 +200,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: theme.COLORS.background.default,
   },
   scrollView: {
     flex: 1,
@@ -233,85 +216,76 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   errorText: {
+    color: theme.COLORS.error,
     fontSize: fontScale(16),
   },
   header: {
-    flexDirection: 'row',
     alignItems: 'center',
     padding: horizontalScale(16),
     paddingTop: verticalScale(24),
-    marginBottom: verticalScale(24),
   },
-  avatarContainer: {
-    width: horizontalScale(80),
-    height: horizontalScale(80),
-    borderRadius: horizontalScale(40),
+  circleContainer: {
+    width: horizontalScale(120),
+    height: horizontalScale(120),
+    borderRadius: horizontalScale(60),
+    backgroundColor: theme.COLORS.primary.main,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: horizontalScale(16),
-  },
-  profileInfo: {
-    flex: 1,
-  },
-  name: {
-    fontSize: fontScale(24),
-    fontWeight: "700",
-    marginBottom: verticalScale(4),
+    marginBottom: verticalScale(24),
   },
   employeeId: {
-    fontSize: fontScale(14),
+    color: theme.COLORS.background.paper,
+    fontSize: fontScale(20),
+    ...theme.FONTS.bold,
   },
   section: {
     padding: horizontalScale(16),
-    marginBottom: verticalScale(24),
+    marginBottom: verticalScale(16),
+    backgroundColor: 'rgba(28, 141, 58, 0.1)',
+    borderRadius: 12,
+    marginHorizontal: horizontalScale(16),
+    borderWidth: 1,
+    borderColor: 'rgba(28, 141, 58, 0.2)',
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: verticalScale(16),
-    paddingBottom: verticalScale(8),
-    borderBottomWidth: 1,
   },
   sectionTitle: {
+    color: theme.COLORS.text.primary,
     fontSize: fontScale(20),
-    fontWeight: "700",
-    marginBottom: verticalScale(16),
+    ...theme.FONTS.bold,
+    marginLeft: horizontalScale(8),
   },
-  infoCard: {
-    padding: moderateScale(16),
-    borderRadius: 12,
+  profileInfo: {
+    gap: verticalScale(12),
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: verticalScale(8),
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
   },
-  infoLabel: {
+  label: {
+    color: theme.COLORS.text.secondary,
     fontSize: fontScale(14),
   },
-  infoValue: {
+  value: {
+    color: theme.COLORS.text.primary,
     fontSize: fontScale(14),
-    fontWeight: "500",
+    ...theme.FONTS.medium,
   },
   menuContainer: {
-    borderRadius: moderateScale(12),
-    marginHorizontal: horizontalScale(16),
-    marginBottom: verticalScale(24),
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    padding: horizontalScale(16),
+    marginTop: verticalScale(24),
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    backgroundColor: theme.COLORS.background.paper,
     padding: moderateScale(16),
-    borderRadius: 12,
+    borderRadius: 8,
     marginBottom: verticalScale(8),
   },
   menuItemLeft: {
@@ -323,6 +297,7 @@ const styles = StyleSheet.create({
     width: horizontalScale(40),
     height: horizontalScale(40),
     borderRadius: horizontalScale(20),
+    backgroundColor: `${theme.COLORS.primary.main}20`,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: horizontalScale(12),
@@ -331,11 +306,30 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   menuItemTitle: {
+    color: theme.COLORS.text.primary,
     fontSize: fontScale(16),
-    fontWeight: "500",
+    ...theme.FONTS.medium,
     marginBottom: verticalScale(4),
   },
   menuItemSubtitle: {
+    color: theme.COLORS.text.secondary,
     fontSize: fontScale(14),
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.COLORS.background.paper,
+    padding: moderateScale(16),
+    borderRadius: 8,
+    margin: horizontalScale(16),
+    marginTop: verticalScale(24),
+    marginBottom: verticalScale(32),
+  },
+  logoutText: {
+    color: theme.COLORS.error,
+    fontSize: fontScale(16),
+    ...theme.FONTS.medium,
+    marginLeft: horizontalScale(8),
   },
 }); 
