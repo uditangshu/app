@@ -32,7 +32,7 @@ jobs:
 
       - name: Build web version
         run: |
-          npx expo export
+          npx expo start --web
           
       - name: Deploy to Vercel
         uses: amondnet/vercel-action@v25
