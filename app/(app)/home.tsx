@@ -58,6 +58,7 @@ export default function HomeScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [isChatVisible, setIsChatVisible] = useState(false);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const [isFromRecentChat, setIsFromRecentChat] = useState(false);
   const PAGE_SIZE = 3;
 
   const pan = useRef(new Animated.ValueXY()).current;
@@ -129,9 +130,12 @@ export default function HomeScreen() {
   const showChat = (chatId?: string) => {
     if (chatId) {
       setSelectedChatId(chatId);
+      setIsFromRecentChat(true);
+    } else {
+      setSelectedChatId(null);
+      setIsFromRecentChat(false);
     }
     setIsChatVisible(true);
-    
     
     Animated.spring(chatHeight, {
       toValue: 1,
@@ -140,17 +144,15 @@ export default function HomeScreen() {
   };
 
   const dismissChat = () => {
-    
-      Animated.timing(chatHeight, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: false,
-      }).start(() => {
-        setIsChatVisible(false);
-        setSelectedChatId(null);
-        
-      })
-      
+    Animated.timing(chatHeight, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: false,
+    }).start(() => {
+      setIsChatVisible(false);
+      setSelectedChatId(null);
+      setIsFromRecentChat(false);
+    });
   };
 
   const chatTranslateY = pan.y.interpolate({
@@ -301,13 +303,17 @@ export default function HomeScreen() {
             ]}
             {...panResponder.panHandlers}
           >
-            <View style={styles.chatHeader}>
+            {/* <View style={styles.chatHeader}>
               <View style={styles.chatHandle} />
               <TouchableOpacity onPress={dismissChat} style={styles.closeButton}>
                 <Ionicons name="close" size={24} color={theme.COLORS.text.primary} />
               </TouchableOpacity>
-            </View>
-            <ChatScreen onClose={dismissChat} initialChatId={selectedChatId} />
+            </View> */}
+            <ChatScreen 
+              onClose={dismissChat} 
+              initialChatId={selectedChatId} 
+              isReadOnly={isFromRecentChat}
+            />
           </Animated.View>
         )}
       </LinearGradient>

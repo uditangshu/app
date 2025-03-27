@@ -49,9 +49,10 @@ interface ScheduledSession {
 interface ChatScreenProps {
   onClose: () => void;
   initialChatId?: string | null;
+  isReadOnly?: boolean;
 }
 
-export default function ChatScreen({ onClose, initialChatId }: ChatScreenProps) {
+export default function ChatScreen({ onClose, initialChatId, isReadOnly = false }: ChatScreenProps) {
   const { accessToken, refreshAccessToken, logout } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -338,7 +339,7 @@ export default function ChatScreen({ onClose, initialChatId }: ChatScreenProps) 
             <Ionicons name="menu" size={24} color={theme.COLORS.text.primary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>
-            {selectedChatId ? `Chat #${selectedChatId}` : 'Chat Assistant'}
+            {selectedChatId ? `Chat #${selectedChatId}` : 'New Chat'}
           </Text>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <Ionicons name="close" size={24} color={theme.COLORS.text.primary} />
@@ -367,38 +368,29 @@ export default function ChatScreen({ onClose, initialChatId }: ChatScreenProps) 
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-          style={[
-            styles.inputContainer,
-            (!activeSession && !selectedChatId) && styles.inputContainerDisabled
-          ]}
-        >
-          <TextInput
-            style={[
-              styles.input,
-              (!activeSession && !selectedChatId) && styles.inputDisabled
-            ]}
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder={(activeSession || selectedChatId) ? "Type your message..." : "No active session"}
-            placeholderTextColor={theme.COLORS.text.secondary}
-            multiline
-            editable={!!(activeSession || selectedChatId)}
-          />
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              ((!activeSession && !selectedChatId) || !inputText.trim()) && styles.sendButtonDisabled
-            ]}
-            onPress={sendMessage}
-            disabled={(!activeSession && !selectedChatId) || !inputText.trim()}
-          >
-            <Ionicons
-              name="send"
-              size={24}
-              color={(activeSession || selectedChatId) && inputText.trim() ? theme.COLORS.primary.main : theme.COLORS.text.secondary}
-            />
-          </TouchableOpacity>
+          style={styles.content}>
+          {!isReadOnly && (
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder="Type your message..."
+                placeholderTextColor={theme.COLORS.text.secondary}
+                multiline
+              />
+              <TouchableOpacity
+                style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
+                onPress={sendMessage}
+                disabled={!inputText.trim()}>
+                <Ionicons
+                  name="send"
+                  size={24}
+                  color={inputText.trim() ? theme.COLORS.primary.main : theme.COLORS.text.secondary}
+                />
+              </TouchableOpacity>
+            </View>
+          )}
         </KeyboardAvoidingView>
       </View>
     </SafeAreaView>
@@ -516,7 +508,7 @@ const styles = StyleSheet.create({
   },
   userMessage: {
     alignSelf: 'flex-end',
-    backgroundColor: theme.COLORS.primary.main,
+    backgroundColor: '#1C8D3A',
   },
   aiMessage: {
     alignSelf: 'flex-start',
@@ -589,11 +581,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     ...theme.FONTS.regular,
   },
-  inputContainerDisabled: {
-    opacity: 0.7,
-  },
-  inputDisabled: {
-    backgroundColor: theme.COLORS.background.elevated,
+  content: {
+    flex: 1,
   },
   selectedChatItem: {
     backgroundColor: theme.COLORS.background.main,
