@@ -8,8 +8,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "test": "jest --watchAll",
-    "build": "expo export:web",
-    "build:prod": "expo export:web"
+    "build": "expo export -p web",
+    "build:prod": "expo export -p web"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.0.0",
