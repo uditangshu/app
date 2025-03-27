@@ -17,7 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../contexts/ThemeContext';
-import { lightTheme, darkTheme } from '../../constants/theme';
+import theme, { lightTheme, darkTheme } from '../../constants/theme';
 import { horizontalScale, verticalScale, moderateScale, fontScale } from '../../utils/responsive';
 import { useAuth } from '../../contexts/AuthContext';
 import ChatScreen from '../modals/chat';
@@ -179,8 +179,8 @@ export default function HomeScreen() {
           {/* Header */}
           <View style={styles.header}>
             <View>
-              <Text style={styles.welcomeText}>Welcome, EMP2001</Text>
-              <Text style={styles.subtitleText}>Your employee dashboard</Text>
+              <Text style={[styles.welcomeText, { color: theme.COLORS.text.primary }]}>Welcome, EMP2001</Text>
+              <Text style={[styles.subtitleText, { color: theme.COLORS.text.secondary }]}>Your employee dashboard</Text>
             </View>
             <View style={styles.headerRight}>
               <TouchableOpacity style={styles.notificationButton}>
@@ -324,15 +324,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: moderateScale(24),
+    padding: horizontalScale(16),
+    paddingTop: Platform.OS === 'android' ? verticalScale(40) : verticalScale(16),
+    backgroundColor: 'transparent',
   },
   welcomeText: {
+    color: 'white',
     fontSize: fontScale(24),
-    fontWeight: "700",
-    marginBottom: verticalScale(4),
+    fontWeight: 'bold',
   },
   subtitleText: {
-    fontSize: fontScale(16),
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: fontScale(14),
+    marginTop: verticalScale(4),
   },
   headerRight: {
     flexDirection: 'row',
@@ -340,53 +344,78 @@ const styles = StyleSheet.create({
   },
   notificationButton: {
     position: 'relative',
-    padding: moderateScale(8),
+    marginRight: horizontalScale(16),
   },
   notificationBadge: {
     position: 'absolute',
-    top: 0,
-    right: 0,
-    backgroundColor: '#FF3B30',
-    borderRadius: 12,
-    minWidth: 20,
+    top: -5,
+    right: -5,
+    backgroundColor: 'red',
+    borderRadius: 10,
+    width: 20,
     height: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: horizontalScale(6),
   },
   badgeText: {
     color: 'white',
     fontSize: fontScale(12),
-    fontWeight: "700",
+  },
+  profileButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    padding: moderateScale(8),
+    borderRadius: 8,
+  },
+  profileText: {
+    color: 'white',
+    marginRight: horizontalScale(4),
   },
   section: {
-    margin: moderateScale(16),
-    padding: moderateScale(16),
+    padding: horizontalScale(16),
+    marginBottom: verticalScale(16),
+    backgroundColor: 'rgba(0,0,0,0.8)', // Darker background for sections
     borderRadius: 12,
+    marginHorizontal: horizontalScale(16),
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: verticalScale(16),
+    marginBottom: verticalScale(8),
   },
   sectionTitle: {
+    color: 'white',
     fontSize: fontScale(20),
-    fontWeight: "700",
-    marginLeft: horizontalScale(12),
+    fontWeight: 'bold',
+    marginLeft: horizontalScale(8),
   },
   sectionSubtitle: {
+    color: 'rgba(255,255,255,0.7)',
     fontSize: fontScale(14),
     marginBottom: verticalScale(16),
   },
-  eventsList: {
-    marginTop: verticalScale(8),
-  },
   eventItem: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: moderateScale(12),
+    backgroundColor: 'rgba(0,0,0,0.6)', // Darker background for event items
+    padding: moderateScale(16),
     borderRadius: 8,
     marginBottom: verticalScale(8),
+  },
+  eventInfo: {
+    flex: 1,
+  },
+  eventTitle: {
+    color: 'white',
+    fontSize: fontScale(16),
+    fontWeight: '500',
+  },
+  eventDate: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: fontScale(14),
+    marginTop: verticalScale(4),
   },
   eventIcon: {
     width: 40,
@@ -396,96 +425,94 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: horizontalScale(12),
   },
-  eventInfo: {
-    flex: 1,
-  },
-  eventTitle: {
-    fontSize: fontScale(16),
-    fontWeight: "500",
-    marginBottom: verticalScale(4),
-  },
-  eventDate: {
-    fontSize: fontScale(14),
+  eventsList: {
+    marginTop: verticalScale(8),
   },
   chatItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: moderateScale(12),
+    backgroundColor: 'rgba(0,0,0,0.6)', // Darker background for chat items
+    padding: moderateScale(16),
     borderRadius: 8,
     marginBottom: verticalScale(8),
+  },
+  chatInfo: {
+    marginLeft: horizontalScale(12),
+    flex: 1,
+  },
+  chatTitle: {
+    color: 'white',
+    fontSize: fontScale(16),
+    fontWeight: '500',
+  },
+  chatMessage: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: fontScale(14),
+    marginTop: verticalScale(4),
   },
   chatIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(28, 141, 58, 0.2)',
+    backgroundColor: 'rgba(28, 141, 58, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: horizontalScale(12),
   },
-  chatInfo: {
-    flex: 1,
-  },
   chatHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: verticalScale(4),
-  },
-  chatTitle: {
-    fontSize: fontScale(16),
-    fontWeight: "500",
+    padding: moderateScale(16),
+    borderBottomWidth: 1,
+    borderBottomColor: theme.COLORS.border.main,
   },
   chatTime: {
+    color: 'rgba(255,255,255,0.5)',
     fontSize: fontScale(12),
-  },
-  chatMessage: {
-    fontSize: fontScale(14),
-  },
-  chatButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    position: 'absolute',
-    bottom: verticalScale(24),
-    right: horizontalScale(24),
-    padding: moderateScale(16),
-    borderRadius: 30,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  chatButtonText: {
-    fontSize: fontScale(16),
-    fontWeight: "500",
-    marginLeft: horizontalScale(8),
-  },
-  chatModal: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  chatHandle: {
-    width: horizontalScale(40),
-    height: verticalScale(4),
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 2,
-  },
-  closeButton: {
-    position: 'absolute',
-    right: horizontalScale(16),
   },
   loadingContainer: {
     padding: verticalScale(20),
     alignItems: 'center',
+  },
+  chatButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.COLORS.primary.main,
+    padding: moderateScale(16),
+    borderRadius: 8,
+    margin: horizontalScale(16),
+    marginTop: verticalScale(24),
+    marginBottom: verticalScale(32),
+  },
+  chatButtonText: {
+    color: 'white',
+    fontSize: fontScale(16),
+    ...theme.FONTS.medium,
+    marginLeft: horizontalScale(8),
+  },
+  chatModal: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: theme.COLORS.border.main,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    overflow: 'hidden',
+  },
+  chatHandle: {
+    width: horizontalScale(40),
+    height: verticalScale(4),
+    backgroundColor: theme.COLORS.border.main,
+    borderRadius: 2,
+    marginBottom: verticalScale(8),
+  },
+  closeButton: {
+    position: 'absolute',
+    right: horizontalScale(16),
+    top: verticalScale(16),
   },
 });
