@@ -9,7 +9,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { API_URL } from '../constants/api';
+import { API_URL } from '../../constants/api';
+import { theme } from '../../constants/theme';
+import { fontScale, horizontalScale, moderateScale, verticalScale } from '../../utils/scaling';
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('');
@@ -65,6 +67,7 @@ export default function ForgotPasswordScreen() {
       <TextInput
         style={styles.input}
         placeholder="Email"
+        placeholderTextColor={theme.COLORS.text.secondary}
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
@@ -97,34 +100,39 @@ export default function ForgotPasswordScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    padding: moderateScale(20),
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: theme.COLORS.background.default,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 10,
+    fontSize: fontScale(24),
+    color: theme.COLORS.text.primary,
+    ...theme.FONTS.bold,
+    marginBottom: verticalScale(10),
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 30,
+    fontSize: fontScale(16),
+    color: theme.COLORS.text.secondary,
+    marginBottom: verticalScale(30),
     textAlign: 'center',
+    ...theme.FONTS.regular,
   },
   input: {
-    height: 50,
+    height: verticalScale(50),
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: theme.COLORS.border.main,
     borderRadius: 8,
-    paddingHorizontal: 15,
-    marginBottom: 20,
-    fontSize: 16,
+    paddingHorizontal: horizontalScale(15),
+    marginBottom: verticalScale(20),
+    fontSize: fontScale(16),
+    backgroundColor: theme.COLORS.background.paper,
+    color: theme.COLORS.text.primary,
+    ...theme.FONTS.regular,
   },
   button: {
-    backgroundColor: '#007AFF',
-    height: 50,
+    backgroundColor: theme.COLORS.primary.main,
+    height: verticalScale(50),
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
@@ -133,16 +141,17 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: theme.COLORS.text.primary,
+    fontSize: fontScale(16),
+    ...theme.FONTS.medium,
   },
   backButton: {
-    marginTop: 20,
+    marginTop: verticalScale(20),
     alignItems: 'center',
   },
   backButtonText: {
-    color: '#007AFF',
-    fontSize: 16,
+    color: theme.COLORS.primary.main,
+    fontSize: fontScale(16),
+    ...theme.FONTS.regular,
   },
 }); 

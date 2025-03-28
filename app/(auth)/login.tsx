@@ -12,7 +12,8 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import theme from '../../constants/theme';
+import { useRouter } from 'expo-router';
+import { theme } from '../../constants/theme';
 import { horizontalScale, verticalScale, moderateScale, fontScale } from '../../utils/responsive';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -23,6 +24,7 @@ export default function LoginScreen() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
+  const router = useRouter();
 
   const handleLogin = async () => {
     if (!employee_id || !password) {
@@ -128,7 +130,10 @@ export default function LoginScreen() {
             </TouchableOpacity>
 
             {/* Forgot Password */}
-            <TouchableOpacity style={styles.forgotPassword}>
+            <TouchableOpacity 
+              style={styles.forgotPassword}
+              onPress={() => router.push('/screens/ForgotPassword')}
+            >
               <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
             </TouchableOpacity>
           </View>

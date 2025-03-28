@@ -8,15 +8,15 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  Animated,
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../../theme';
+import { theme } from '../../constants/theme';
 import { fontScale, horizontalScale, moderateScale, verticalScale } from '../../utils/scaling';
 import { useAuth } from '../../contexts/AuthContext';
+import { useRouter } from 'expo-router';
 
 interface Message {
   id: string;
@@ -76,6 +76,7 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
     // Add more chat history items as needed
   ]);
   const flatListRef = useRef<FlatList>(null);
+  const router = useRouter();
 
   useEffect(() => {
     if (initialChatId) {
@@ -366,10 +367,10 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
           />
         )}
 
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.content}>
-          {!isReadOnly && (
+        {(!isReadOnly && (activeSession || selectedChatId)) && (
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.content}>
             <View style={styles.inputContainer}>
               <TextInput
                 style={styles.input}
@@ -390,8 +391,8 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
                 />
               </TouchableOpacity>
             </View>
-          )}
-        </KeyboardAvoidingView>
+          </KeyboardAvoidingView>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -400,7 +401,7 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.COLORS.background.main,
+    backgroundColor: theme.COLORS.background.default,
   },
   mainContent: {
     flex: 1,
@@ -410,8 +411,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: moderateScale(16),
     borderBottomWidth: 1,
-    borderBottomColor: theme.COLORS.border,
-    backgroundColor: theme.COLORS.background.elevated,
+    borderBottomColor: theme.COLORS.border.main,
+    backgroundColor: theme.COLORS.background.paper,
   },
   menuButton: {
     marginRight: horizontalScale(16),
@@ -422,7 +423,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: fontScale(20),
     color: theme.COLORS.text.primary,
-    ...theme.FONTS.semibold,
+    ...theme.FONTS.medium,
   },
   sidebar: {
     position: 'absolute',
@@ -430,7 +431,7 @@ const styles = StyleSheet.create({
     left: 0,
     bottom: 0,
     width: Dimensions.get('window').width * 0.8,
-    backgroundColor: theme.COLORS.background.elevated,
+    backgroundColor: theme.COLORS.background.paper,
     zIndex: 1000,
     elevation: 5,
     shadowColor: '#000',
@@ -444,12 +445,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: moderateScale(16),
     borderBottomWidth: 1,
-    borderBottomColor: theme.COLORS.border,
+    borderBottomColor: theme.COLORS.border.main,
   },
   sidebarTitle: {
     fontSize: fontScale(20),
     color: theme.COLORS.text.primary,
-    ...theme.FONTS.semibold,
+    ...theme.FONTS.medium,
   },
   chatHistoryList: {
     padding: moderateScale(16),
@@ -460,7 +461,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: moderateScale(12),
     borderBottomWidth: 1,
-    borderBottomColor: theme.COLORS.border,
+    borderBottomColor: theme.COLORS.border.main,
   },
   chatHistoryContent: {
     flex: 1,
@@ -512,7 +513,7 @@ const styles = StyleSheet.create({
   },
   aiMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: theme.COLORS.background.elevated,
+    backgroundColor: theme.COLORS.background.paper,
   },
   messageText: {
     color: theme.COLORS.text.primary,
@@ -528,15 +529,15 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     padding: moderateScale(16),
-    backgroundColor: theme.COLORS.background.elevated,
+    backgroundColor: theme.COLORS.background.paper,
     borderTopWidth: 1,
-    borderTopColor: theme.COLORS.border,
+    borderTopColor: theme.COLORS.border.main,
   },
   input: {
     flex: 1,
     minHeight: verticalScale(40),
     maxHeight: verticalScale(100),
-    backgroundColor: theme.COLORS.background.main,
+    backgroundColor: theme.COLORS.background.paper,
     borderRadius: 20,
     paddingHorizontal: horizontalScale(16),
     paddingVertical: verticalScale(8),
@@ -549,7 +550,7 @@ const styles = StyleSheet.create({
     width: horizontalScale(40),
     height: verticalScale(40),
     borderRadius: 20,
-    backgroundColor: theme.COLORS.background.main,
+    backgroundColor: theme.COLORS.background.paper,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -560,7 +561,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.COLORS.background.main,
+    backgroundColor: theme.COLORS.background.paper,
   },
   noSessionContainer: {
     flex: 1,
@@ -571,7 +572,7 @@ const styles = StyleSheet.create({
   noSessionTitle: {
     fontSize: fontScale(20),
     color: theme.COLORS.text.primary,
-    ...theme.FONTS.semibold,
+    ...theme.FONTS.medium,
     marginTop: verticalScale(16),
     marginBottom: verticalScale(8),
   },
@@ -585,6 +586,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   selectedChatItem: {
-    backgroundColor: theme.COLORS.background.main,
+  backgroundColor: theme.COLORS.background.paper,
   },
 }); 

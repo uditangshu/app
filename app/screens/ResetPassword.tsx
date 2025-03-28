@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { API_URL } from '../constants/api';
+import { API_URL } from '../../constants/api';
 
 export default function ResetPasswordScreen() {
   const [newPassword, setNewPassword] = useState('');
