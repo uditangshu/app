@@ -1,23 +1,6 @@
 {
-  "version": 2,
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "framework": "expo",
-  "regions": ["all"],
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": { "distDir": "dist" }
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
-  ],
-  "env": {
-    "EXPO_ROUTER_APP_ROOT": "app"
-  }
-} 
+	"buildCommand": "npx expo export -p web",
+	"outputDirectory": "dist",
+	"devCommand": "expo start --web",
+	"rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
