@@ -12,6 +12,7 @@ import {
   Animated,
   Dimensions,
   PanResponder,
+  AppState,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +22,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import ChatScreen from '../modals/chat';
 import { API_URL } from '../../constants/api';
 import NotificationsModal from '../modals/notifications';
+import Shimmer from '../components/Shimmer';
 
 interface EventItem {
   id: string;
@@ -53,6 +55,57 @@ interface Notification {
   status: 'read' | 'unread';
 }
 
+interface EmployeeProfile {
+  employee_id: string;
+  name: string;
+  email: string;
+  role: string;
+  manager_id: string;
+  is_blocked: boolean;
+  mood_stats: {
+    average_score: number;
+    total_sessions: number;
+    last_5_scores: number[];
+  };
+  chat_summary: {
+    chat_id: string;
+    last_message: string;
+    last_message_time: string;
+    unread_count: number;
+    total_messages: number;
+    chat_mode: string;
+    is_escalated: boolean;
+    created_at: string;
+  };
+  upcoming_meets: number;
+  upcoming_sessions: number;
+  company_data: {
+    activity: Array<{
+      Date: string;
+      Teams_Messages_Sent: number;
+      Emails_Sent: number;
+      Meetings_Attended: number;
+      Work_Hours: number;
+    }>;
+    leave: Array<{
+      Leave_Type: string;
+      Leave_Days: number;
+      Leave_Start_Date: string;
+      Leave_End_Date: string;
+    }>;
+    performance: Array<{
+      Review_Period: string;
+      Performance_Rating: number;
+      Manager_Feedback: string;
+      Promotion_Consideration: boolean;
+    }>;
+    vibemeter: Array<{
+      Response_Date: string;
+      Vibe_Score: number;
+    }>;
+  };
+}
+
 const events: EventItem[] = [
   { id: '1', title: 'Team Meeting', date: '2023-03-25 10:00 AM', type: 'Meeting' },
   { id: '2', title: 'Project Deadline', date: '2023-03-28', type: 'Deadline' },
@@ -74,6 +127,8 @@ export default function HomeScreen() {
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notificationsPage, setNotificationsPage] = useState(1);
   const [hasMoreNotifications, setHasMoreNotifications] = useState(true);
+  const [profile, setProfile] = useState<EmployeeProfile | null>(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
   const PAGE_SIZE = 3;
 
   const pan = useRef(new Animated.ValueXY()).current;
@@ -180,10 +235,10 @@ export default function HomeScreen() {
         )
       );
 
-      // Update notification status on server
+    
       try {
         const response = await fetch(
-          `https://velvety-ray-454718-b8.ue.r.appspot.com/employee/notification/${notification.id}/read`,
+          `${API_URL}/employee/notification/${notification.id}/read`,
           {
             method: 'PATCH',
             headers: {
@@ -211,17 +266,60 @@ export default function HomeScreen() {
     }
   };
 
+  const fetchProfile = async () => {
+    if (!accessToken) return;
+    
+    try {
+      setIsProfileLoading(true);
+      const response = await fetch(
+        `${API_URL}/employee/profile`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch profile');
+      }
+
+      const data = await response.json();
+      setProfile(data);
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    } finally {
+      setIsProfileLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchChats();
     fetchNotifications(1, true);
+    fetchProfile();
     
-    // Set up a refresh interval only for unread count
+    
     const interval = setInterval(() => {
-      // Only refresh first page to update unread count
       fetchNotifications(1, true);
-    }, 30000);
+    }, 15000); 
 
     return () => clearInterval(interval);
+  }, []);
+
+  // Add new useEffect for page changes - only ping API
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: string) => {
+      if (nextAppState === 'active') {
+        fetchNotifications(1, true);
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      subscription.remove();
+    };
   }, []);
 
   const formatDate = (dateString: string) => {
@@ -276,6 +374,46 @@ export default function HomeScreen() {
 
   const unreadCount = notifications.filter(n => n.status === 'unread').length;
 
+  const renderUpdateCardShimmer = () => (
+    <View style={styles.updateCardContent}>
+      <View style={[styles.updateIconContainer, { marginBottom: verticalScale(12) }]}>
+        <Shimmer width={40} height={40} borderRadius={20} />
+      </View>
+      <View style={styles.updateTextContainer}>
+        <Shimmer 
+          width={80} 
+          height={14} 
+          style={{ marginBottom: verticalScale(4) }} 
+        />
+        <Shimmer 
+          width={60} 
+          height={24} 
+          style={{ marginBottom: verticalScale(4) }} 
+        />
+        <Shimmer width={100} height={12} />
+      </View>
+    </View>
+  );
+
+  const renderChatItemShimmer = () => (
+    <View style={styles.chatItem}>
+      <View style={styles.chatIconContainer}>
+        <Shimmer width={40} height={40} borderRadius={20} />
+      </View>
+      <View style={styles.chatInfo}>
+        <View style={styles.chatHeader}>
+          <Shimmer width={120} height={16} />
+          <Shimmer width={60} height={12} />
+        </View>
+        <Shimmer 
+          width={Dimensions.get('window').width - 140} 
+          height={14} 
+          style={{ marginTop: verticalScale(4) }} 
+        />
+      </View>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
@@ -309,31 +447,150 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* Upcoming Events Section */}
+          {/* Updates Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="calendar-outline" size={24} color="white" />
-              <Text style={styles.sectionTitle}>Upcoming Events</Text>
+              <Ionicons name="stats-chart" size={24} color="white" />
+              <Text style={styles.sectionTitle}>Your Updates</Text>
             </View>
-            <Text style={styles.sectionSubtitle}>Your scheduled events and deadlines</Text>
-            
-            {events.map((event) => (
-              <View key={event.id} style={styles.eventItem}>
-                <View style={styles.eventInfo}>
-                  <Text style={styles.eventTitle}>{event.title}</Text>
-                  <Text style={styles.eventDate}>{event.date}</Text>
-                </View>
-                <View style={[styles.eventBadge, styles[event.type.toLowerCase() as keyof typeof styles] as ViewStyle]}>
-                  <Text style={styles.eventBadgeText}>{event.type}</Text>
-                </View>
-              </View>
-            ))}
+            <Text style={styles.sectionSubtitle}>Recent activity and performance</Text>
 
-            <TouchableOpacity style={styles.viewMoreButton}>
-              <Text style={styles.viewMoreText}>View Calendar</Text>
-              <Ionicons name="arrow-forward" size={20} color="#1C8D3A" />
-            </TouchableOpacity>
+            <View style={styles.updateGrid}>
+              {isProfileLoading ? (
+                <>
+                  {/* Mood Score Card */}
+                  <View style={[styles.updateCard, styles.updateCardShimmer]}>
+                    <View style={styles.updateIconContainer}>
+                      <Shimmer width={24} height={24} borderRadius={12} />
+                    </View>
+                    <View style={styles.updateContent}>
+                      <Shimmer width={70} height={14} />
+                      <View style={[styles.valueContainer, { marginTop: verticalScale(4) }]}>
+                        <Shimmer width={30} height={24} />
+                        <Shimmer width={20} height={24} style={{ marginLeft: 4 }} />
+                      </View>
+                      <View style={[styles.subtextContainer, { marginTop: verticalScale(4) }]}>
+                        <Shimmer width={20} height={12} />
+                        <Shimmer width={50} height={12} style={{ marginLeft: 4 }} />
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Upcoming Meetings Card */}
+                  <View style={[styles.updateCard, styles.updateCardShimmer]}>
+                    <View style={styles.updateIconContainer}>
+                      <Shimmer width={24} height={24} borderRadius={12} />
+                    </View>
+                    <View style={styles.updateContent}>
+                      <Shimmer width={70} height={14} />
+                      <View style={[styles.valueContainer, { marginTop: verticalScale(4) }]}>
+                        <Shimmer width={20} height={24} />
+                      </View>
+                      <Shimmer width={50} height={12} style={{ marginTop: verticalScale(4) }} />
+                    </View>
+                  </View>
+
+                  {/* Sessions Card */}
+                  <View style={[styles.updateCard, styles.updateCardShimmer]}>
+                    <View style={styles.updateIconContainer}>
+                      <Shimmer width={24} height={24} borderRadius={12} />
+                    </View>
+                    <View style={styles.updateContent}>
+                      <Shimmer width={60} height={14} />
+                      <View style={[styles.valueContainer, { marginTop: verticalScale(4) }]}>
+                        <Shimmer width={20} height={24} />
+                      </View>
+                      <Shimmer width={60} height={12} style={{ marginTop: verticalScale(4) }} />
+                    </View>
+                  </View>
+
+                  {/* Performance Card */}
+                  <View style={[styles.updateCard, styles.updateCardShimmer]}>
+                    <View style={styles.updateIconContainer}>
+                      <Shimmer width={24} height={24} borderRadius={12} />
+                    </View>
+                    <View style={styles.updateContent}>
+                      <Shimmer width={90} height={14} />
+                      <View style={[styles.valueContainer, { marginTop: verticalScale(4) }]}>
+                        <Shimmer width={30} height={24} />
+                        <Shimmer width={20} height={24} style={{ marginLeft: 4 }} />
+                      </View>
+                      <Shimmer width={100} height={12} style={{ marginTop: verticalScale(4) }} />
+                    </View>
+                  </View>
+                </>
+              ) : profile ? (
+                <>
+                  {/* Mood Score */}
+                  <View style={styles.updateCard}>
+                    <View style={styles.updateIconContainer}>
+                      <Ionicons name="happy-outline" size={24} color={theme.COLORS.primary.main} />
+                    </View>
+                    <Text style={styles.updateLabel}>Mood Score</Text>
+                    <Text style={styles.updateValue}>
+                      {profile.mood_stats.average_score.toFixed(1)}/5
+                    </Text>
+                    <Text style={styles.updateSubtext}>
+                      {profile.mood_stats.total_sessions} sessions
+                    </Text>
+                  </View>
+
+                  {/* Upcoming Meetings */}
+                  <View style={styles.updateCard}>
+                    <View style={styles.updateIconContainer}>
+                      <Ionicons name="calendar" size={24} color={theme.COLORS.primary.main} />
+                    </View>
+                    <Text style={styles.updateLabel}>Upcoming</Text>
+                    <Text style={styles.updateValue}>{profile.upcoming_meets}</Text>
+                    <Text style={styles.updateSubtext}>meetings</Text>
+                  </View>
+
+                  {/* Upcoming Sessions */}
+                  <View style={styles.updateCard}>
+                    <View style={styles.updateIconContainer}>
+                      <Ionicons name="people" size={24} color={theme.COLORS.primary.main} />
+                    </View>
+                    <Text style={styles.updateLabel}>Sessions</Text>
+                    <Text style={styles.updateValue}>{profile.upcoming_sessions}</Text>
+                    <Text style={styles.updateSubtext}>upcoming</Text>
+                  </View>
+
+                  {/* Latest Performance */}
+                  {profile.company_data.performance.length > 0 && (
+                    <View style={styles.updateCard}>
+                      <View style={styles.updateIconContainer}>
+                        <Ionicons name="trophy" size={24} color={theme.COLORS.primary.main} />
+                      </View>
+                      <Text style={styles.updateLabel}>Performance</Text>
+                      <Text style={styles.updateValue}>
+                        {profile.company_data.performance[0].Performance_Rating}/5
+                      </Text>
+                      <Text style={styles.updateSubtext}>
+                        {profile.company_data.performance[0].Manager_Feedback}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Latest Activity */}
+                  {profile.company_data.activity.length > 0 && (
+                    <View style={[styles.updateCard, styles.updateCardWide]}>
+                      <View style={styles.updateIconContainer}>
+                        <Ionicons name="time" size={24} color={theme.COLORS.primary.main} />
+                      </View>
+                      <Text style={styles.updateLabel}>Today's Work</Text>
+                      <Text style={styles.updateValue}>
+                        {profile.company_data.activity[0].Work_Hours}h
+                      </Text>
+                      <Text style={styles.updateSubtext}>
+                        {profile.company_data.activity[0].Meetings_Attended} meetings
+                      </Text>
+                    </View>
+                  )}
+                </>
+              ) : null}
+            </View>
           </View>
+          
 
           {/* Recent Chats Section */}
           <View style={styles.section}>
@@ -344,8 +601,12 @@ export default function HomeScreen() {
             <Text style={styles.sectionSubtitle}>Your recent conversations</Text>
 
             {loading && page === 1 ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={theme.COLORS.primary.main} />
+              <View style={styles.chatList}>
+                {[1, 2, 3].map((key) => (
+                  <View key={key} style={styles.chatItemShimmer}>
+                    {renderChatItemShimmer()}
+                  </View>
+                ))}
               </View>
             ) : (
               <>
@@ -622,11 +883,10 @@ const styles = StyleSheet.create({
   },
   chatHeader: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: moderateScale(16),
-    borderBottomWidth: 1,
-    borderBottomColor: theme.COLORS.border.main,
+    width: '100%',
+    marginBottom: verticalScale(4),
   },
   chatTime: {
     color: 'rgba(255,255,255,0.5)',
@@ -724,5 +984,76 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: horizontalScale(16),
     top: verticalScale(16),
+  },
+  updateGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginTop: verticalScale(8),
+  },
+  updateCard: {
+    width: '48%',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    padding: moderateScale(16),
+    borderRadius: 12,
+    marginBottom: verticalScale(16),
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  updateIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(28, 141, 58, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  updateLabel: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: fontScale(14),
+    ...theme.FONTS.medium,
+  },
+  updateValue: {
+    color: 'white',
+    fontSize: fontScale(24),
+    ...theme.FONTS.bold,
+    marginTop: verticalScale(4),
+  },
+  updateSubtext: {
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: fontScale(12),
+    marginTop: verticalScale(4),
+  },
+  updateCardWide: {
+    width: '100%', // Make the last card full width
+  },
+  shimmerContainer: {
+    marginBottom: verticalScale(8),
+  },
+  updateCardContent: {
+    flex: 1,
+  },
+  updateTextContainer: {
+    marginTop: verticalScale(12),
+  },
+  updateCardShimmer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+  },
+  chatItemShimmer: {
+    marginBottom: verticalScale(8),
+  },
+  chatList: {
+    marginTop: verticalScale(8),
+  },
+  updateContent: {
+    marginTop: verticalScale(12),
+  },
+  valueContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  subtextContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });
