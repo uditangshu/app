@@ -15,12 +15,12 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import theme from '../../constants/theme';
+import { theme } from '../../constants/theme';
 import { horizontalScale, verticalScale, moderateScale, fontScale } from '../../utils/responsive';
 import { useAuth } from '../../contexts/AuthContext';
 import ChatScreen from '../modals/chat';
 import { API_URL } from '../../constants/api';
+import NotificationsModal from '../modals/notifications';
 
 interface EventItem {
   id: string;
@@ -44,6 +44,15 @@ interface ChatResponse {
   total_chats: number;
 }
 
+interface Notification {
+  id: string;
+  employee_id: string;
+  title: string;
+  description: string;
+  created_at: string;
+  status: 'read' | 'unread';
+}
+
 const events: EventItem[] = [
   { id: '1', title: 'Team Meeting', date: '2023-03-25 10:00 AM', type: 'Meeting' },
   { id: '2', title: 'Project Deadline', date: '2023-03-28', type: 'Deadline' },
@@ -60,6 +69,11 @@ export default function HomeScreen() {
   const [isChatVisible, setIsChatVisible] = useState(false);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [isFromRecentChat, setIsFromRecentChat] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notificationModalVisible, setNotificationModalVisible] = useState(false);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationsPage, setNotificationsPage] = useState(1);
+  const [hasMoreNotifications, setHasMoreNotifications] = useState(true);
   const PAGE_SIZE = 3;
 
   const pan = useRef(new Animated.ValueXY()).current;
@@ -114,10 +128,101 @@ export default function HomeScreen() {
     }
   };
 
+  const fetchNotifications = async (page = 1, isRefresh = false) => {
+    if (!accessToken || (notificationsLoading && !isRefresh)) return;
+    
+    try {
+      setNotificationsLoading(true);
+      const response = await fetch(
+        `${API_URL}/employee/ping?page=${page}&limit=10`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch notifications');
+      }
+
+      const data = await response.json();
+      const newNotifications = data.notifications || [];
+      
+      // If it's a refresh or first page, replace the notifications
+      // Otherwise, append new notifications
+      setNotifications(prev => 
+        isRefresh || page === 1 ? newNotifications : [...prev, ...newNotifications]
+      );
+      
+      setHasMoreNotifications(newNotifications.length === 10);
+      setNotificationsPage(page);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  };
+
+  const handleLoadMoreNotifications = () => {
+    if (!notificationsLoading && hasMoreNotifications) {
+      fetchNotifications(notificationsPage + 1, false);
+    }
+  };
+
+  const handleNotificationPress = async (notification: Notification) => {
+    if (notification.status === 'unread') {
+      // Update notification status locally
+      setNotifications(prev =>
+        prev.map(n =>
+          n.id === notification.id ? { ...n, status: 'read' as const } : n
+        )
+      );
+
+      // Update notification status on server
+      try {
+        const response = await fetch(
+          `https://velvety-ray-454718-b8.ue.r.appspot.com/employee/notification/${notification.id}/read`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to mark notification as read');
+        }
+
+        // Refresh notifications after marking as read
+        fetchNotifications(1, true);
+      } catch (error) {
+        console.error('Error marking notification as read:', error);
+        // Revert local state if server update fails
+        setNotifications(prev =>
+          prev.map(n =>
+            n.id === notification.id ? { ...n, status: 'unread' as const } : n
+          )
+        );
+      }
+    }
+  };
+
   useEffect(() => {
     fetchChats();
+    fetchNotifications(1, true);
     
-  }, [page]);
+    // Set up a refresh interval only for unread count
+    const interval = setInterval(() => {
+      // Only refresh first page to update unread count
+      fetchNotifications(1, true);
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -169,6 +274,8 @@ export default function HomeScreen() {
     outputRange: [0, 1],
   });
 
+  const unreadCount = notifications.filter(n => n.status === 'unread').length;
+
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
@@ -176,20 +283,29 @@ export default function HomeScreen() {
         style={styles.gradientBackground}
       >
         <ScrollView style={styles.scrollView}>
-          {/* Header */}
           <View style={styles.header}>
             <View>
               <Text style={styles.welcomeText}>Welcome, {user?.employee_id}</Text>
               <Text style={styles.subtitleText}>Your employee dashboard</Text>
             </View>
             <View style={styles.headerRight}>
-              <TouchableOpacity style={styles.notificationButton}>
-                <Ionicons name="notifications-outline" size={24} color="white" />
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.badgeText}>3</Text>
-                </View>
+              <TouchableOpacity
+                style={styles.notificationButton}
+                onPress={() => setNotificationModalVisible(true)}
+              >
+                <Ionicons
+                  name="notifications-outline"
+                  size={24}
+                  color={theme.COLORS.text.primary}
+                />
+                {unreadCount > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </Text>
+                  </View>
+                )}
               </TouchableOpacity>
-              
             </View>
           </View>
 
@@ -319,6 +435,15 @@ export default function HomeScreen() {
             />
           </Animated.View>
         )}
+
+        <NotificationsModal
+          visible={notificationModalVisible}
+          onClose={() => setNotificationModalVisible(false)}
+          notifications={notifications}
+          loading={notificationsLoading}
+          onLoadMore={handleLoadMoreNotifications}
+          onNotificationPress={handleNotificationPress}
+        />
       </LinearGradient>
     </SafeAreaView>
   );
@@ -358,22 +483,24 @@ const styles = StyleSheet.create({
   },
   notificationButton: {
     position: 'relative',
-    marginRight: horizontalScale(16),
+    padding: moderateScale(4),
   },
-  notificationBadge: {
+  badge: {
     position: 'absolute',
-    top: -5,
-    right: -5,
-    backgroundColor: 'red',
+    top: 0,
+    right: 0,
+    backgroundColor: theme.COLORS.error,
     borderRadius: 10,
-    width: 20,
+    minWidth: 20,
     height: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 4,
   },
   badgeText: {
-    color: 'white',
+    color: '#fff',
     fontSize: fontScale(12),
+    ...theme.FONTS.medium,
   },
   profileButton: {
     flexDirection: 'row',

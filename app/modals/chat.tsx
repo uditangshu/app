@@ -115,7 +115,7 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
     try {
       setIsLoading(true);
       const response = await fetch(
-        'https://backend-deployment-792.as.r.appspot.com/employee/scheduled-sessions',
+        `${API_URL}/employee/scheduled-sessions`,
         {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
