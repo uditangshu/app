@@ -16,6 +16,7 @@ import { useRouter } from 'expo-router';
 import { theme } from '../../constants/theme';
 import { horizontalScale, verticalScale, moderateScale, fontScale } from '../../utils/responsive';
 import { useAuth } from '../../contexts/AuthContext';
+import { API_URL } from '../../constants/api';
 
 export default function LoginScreen() {
   const [employee_id, setEmployeeId] = useState('');
@@ -35,7 +36,7 @@ export default function LoginScreen() {
     try {
       setIsLoading(true);
       setError('');
-      const response = await fetch('https://backend-deployment-792.as.r.appspot.com/auth/login', {
+      const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

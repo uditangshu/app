@@ -20,6 +20,7 @@ import theme from '../../constants/theme';
 import { horizontalScale, verticalScale, moderateScale, fontScale } from '../../utils/responsive';
 import { useAuth } from '../../contexts/AuthContext';
 import ChatScreen from '../modals/chat';
+import { API_URL } from '../../constants/api';
 
 interface EventItem {
   id: string;
@@ -50,7 +51,7 @@ const events: EventItem[] = [
 ];
 
 export default function HomeScreen() {
-  const router = useRouter();
+  const { user } = useAuth();
   const { accessToken } = useAuth();
   const [chats, setChats] = useState<ChatItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,11 +87,13 @@ export default function HomeScreen() {
     })
   ).current;
 
+  
+
   const fetchChats = async () => {
     try {
       setLoading(true);
       const response = await fetch(
-        `https://backend-deployment-792.as.r.appspot.com/employee/chats?page=${page}&limit=${PAGE_SIZE}`,
+        `${API_URL}/employee/chats?page=${page}&limit=${PAGE_SIZE}`,
         {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -101,7 +104,6 @@ export default function HomeScreen() {
       if (!response.ok) {
         throw new Error('Failed to fetch chats');
       }
-
       const data: ChatResponse = await response.json();
       setChats(prevChats => page === 1 ? data.chats : [...prevChats, ...data.chats]);
       setHasMore(data.chats.length === PAGE_SIZE);
@@ -114,6 +116,7 @@ export default function HomeScreen() {
 
   useEffect(() => {
     fetchChats();
+    
   }, [page]);
 
   const formatDate = (dateString: string) => {
@@ -176,7 +179,7 @@ export default function HomeScreen() {
           {/* Header */}
           <View style={styles.header}>
             <View>
-              <Text style={styles.welcomeText}>Welcome, EMP2001</Text>
+              <Text style={styles.welcomeText}>Welcome, {user?.employee_id}</Text>
               <Text style={styles.subtitleText}>Your employee dashboard</Text>
             </View>
             <View style={styles.headerRight}>

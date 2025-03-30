@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import theme from '../../constants/theme';
 import { horizontalScale, verticalScale, moderateScale, fontScale } from '../../utils/responsive';
 import { useAuth } from '../../contexts/AuthContext';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_URL } from '../../constants/api';
 
 interface EmployeeProfile {
   employee_id: string;
@@ -73,7 +73,7 @@ export default function ProfileScreen() {
     try {
       setLoading(true);
       const response = await fetch(
-        'https://backend-deployment-792.as.r.appspot.com/employee/profile',
+        `${API_URL}/employee/profile`,
         {
           headers: {
             'Authorization': `Bearer ${accessToken}`,

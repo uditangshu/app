@@ -17,6 +17,7 @@ import { theme } from '../../constants/theme';
 import { fontScale, horizontalScale, moderateScale, verticalScale } from '../../utils/scaling';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'expo-router';
+import { API_URL } from '../../constants/api';
 
 interface Message {
   id: string;
@@ -161,7 +162,7 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
 
     try {
       setIsLoading(true);
-      const response = await fetch(`https://backend-deployment-792.as.r.appspot.com/employee/chats/${chatId}/messages`, {
+      const response = await fetch(`${API_URL}/employee/chats/${chatId}/messages`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
         },
@@ -214,7 +215,7 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
     scrollToBottom();
 
     try {
-      const response = await fetch('https://backend-deployment-792.as.r.appspot.com/llm/chat/message', {
+      const response = await fetch(`${API_URL}/llm/chat/message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

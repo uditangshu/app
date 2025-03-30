@@ -9,9 +9,10 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import theme from '../../constants/theme';
+import { theme } from '../../constants/theme';
 import { horizontalScale, verticalScale, moderateScale, fontScale } from '../../utils/responsive';
 import { useAuth } from '../../contexts/AuthContext';
+import { API_URL } from '../../constants/api';
 
 interface EmployeeProfile {
   employee_id: string;
@@ -70,7 +71,7 @@ export default function StatisticsScreen() {
     try {
       setLoading(true);
       const response = await fetch(
-        'https://backend-deployment-792.as.r.appspot.com/employee/profile',
+        `${API_URL}/employee/profile`,
         {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -115,9 +116,12 @@ export default function StatisticsScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
         {/* Mood Statistics */}
-        <View style={styles.section}>
+        <LinearGradient
+          colors={['rgba(134, 188, 37, 0.1)', 'rgba(134, 188, 37, 0.05)']}
+          style={styles.section}
+        >
           <View style={styles.sectionHeader}>
-            <Ionicons name="stats-chart-outline" size={24} color="white" />
+            <Ionicons name="stats-chart-outline" size={24} color={theme.COLORS.text.primary} />
             <Text style={styles.sectionTitle}>Mood Statistics</Text>
           </View>
           <View style={styles.moodStats}>
@@ -131,7 +135,7 @@ export default function StatisticsScreen() {
             </View>
             <View style={styles.emotionDistribution}>
               <Text style={styles.subheader}>Emotion Distribution</Text>
-              {Object.entries(profile.mood_stats.emotion_distribution).map(([emotion, count]) => (
+              {Object.entries(profile.mood_stats?.emotion_distribution || {}).map(([emotion, count]) => (
                 <View key={emotion} style={styles.emotionRow}>
                   <Text style={styles.emotionLabel}>{emotion}</Text>
                   <Text style={styles.emotionValue}>{count}</Text>
@@ -139,12 +143,15 @@ export default function StatisticsScreen() {
               ))}
             </View>
           </View>
-        </View>
+        </LinearGradient>
 
         {/* Leave Information */}
-        <View style={styles.section}>
+        <LinearGradient
+          colors={['rgba(134, 188, 37, 0.1)', 'rgba(134, 188, 37, 0.05)']}
+          style={styles.section}
+        >
           <View style={styles.sectionHeader}>
-            <Ionicons name="calendar-outline" size={24} color="white" />
+            <Ionicons name="calendar-outline" size={24} color={theme.COLORS.text.primary} />
             <Text style={styles.sectionTitle}>Leave Information</Text>
           </View>
           {profile.company_data.leave.length > 0 ? (
@@ -163,12 +170,15 @@ export default function StatisticsScreen() {
           ) : (
             <Text style={styles.noDataText}>No leave records found</Text>
           )}
-        </View>
+        </LinearGradient>
 
         {/* Performance & Vibe */}
-        <View style={styles.section}>
+        <LinearGradient
+          colors={['rgba(134, 188, 37, 0.1)', 'rgba(134, 188, 37, 0.05)']}
+          style={styles.section}
+        >
           <View style={styles.sectionHeader}>
-            <Ionicons name="trending-up-outline" size={24} color="white" />
+            <Ionicons name="trending-up-outline" size={24} color={theme.COLORS.text.primary} />
             <Text style={styles.sectionTitle}>Performance & Vibe</Text>
           </View>
           {profile.company_data.vibemeter.length > 0 ? (
@@ -186,7 +196,7 @@ export default function StatisticsScreen() {
           ) : (
             <Text style={styles.noDataText}>No vibe data available</Text>
           )}
-        </View>
+        </LinearGradient>
       </ScrollView>
     </SafeAreaView>
   );
@@ -215,13 +225,11 @@ const styles = StyleSheet.create({
     fontSize: fontScale(16),
   },
   section: {
-    padding: horizontalScale(16),
     marginBottom: verticalScale(16),
-    backgroundColor: 'rgba(28, 141, 58, 0.1)',
     borderRadius: 12,
     marginHorizontal: horizontalScale(16),
-    borderWidth: 1,
-    borderColor: 'rgba(28, 141, 58, 0.2)',
+    padding: horizontalScale(16),
+    overflow: 'hidden',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -287,7 +295,7 @@ const styles = StyleSheet.create({
     gap: verticalScale(12),
   },
   leaveRow: {
-    backgroundColor: 'rgba(28, 141, 58, 0.05)',
+    backgroundColor: 'rgba(134, 188, 37, 0.05)',
     padding: moderateScale(12),
     borderRadius: 8,
     gap: verticalScale(4),
@@ -310,7 +318,7 @@ const styles = StyleSheet.create({
     gap: verticalScale(12),
   },
   vibeRow: {
-    backgroundColor: 'rgba(28, 141, 58, 0.05)',
+    backgroundColor: 'rgba(134, 188, 37, 0.05)',
     padding: moderateScale(12),
     borderRadius: 8,
     gap: verticalScale(4),
