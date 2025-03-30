@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   SafeAreaView,
-  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +12,7 @@ import { theme } from '../../constants/theme';
 import { horizontalScale, verticalScale, moderateScale, fontScale } from '../../utils/responsive';
 import { useAuth } from '../../contexts/AuthContext';
 import { API_URL } from '../../constants/api';
+import Shimmer from '../components/Shimmer';
 
 interface EmployeeProfile {
   employee_id: string;
@@ -62,6 +62,40 @@ interface EmployeeProfile {
   };
 }
 
+export const StatisticsShimmer = () => (
+  <View style={styles.statisticsContainer}>
+    {/* Header Shimmer */}
+    <View style={styles.statisticsHeader}>
+      <Shimmer width={150} height={24} style={{ marginBottom: verticalScale(8) }} />
+      <Shimmer width={200} height={16} />
+    </View>
+
+    {/* Stats Grid Shimmer */}
+    <View style={styles.statsGrid}>
+      {[1, 2, 3, 4].map((index) => (
+        <View key={index} style={styles.statCard}>
+          <Shimmer width={40} height={40} borderRadius={20} style={{ marginBottom: verticalScale(8) }} />
+          <Shimmer width={80} height={16} style={{ marginBottom: verticalScale(4) }} />
+          <Shimmer width={60} height={24} style={{ marginBottom: verticalScale(4) }} />
+          <Shimmer width={100} height={12} />
+        </View>
+      ))}
+    </View>
+
+    {/* Charts Shimmer */}
+    <View style={styles.chartsContainer}>
+      <View style={styles.chartSection}>
+        <Shimmer width={120} height={20} style={{ marginBottom: verticalScale(12) }} />
+        <Shimmer width={'100%'} height={200} />
+      </View>
+      <View style={styles.chartSection}>
+        <Shimmer width={140} height={20} style={{ marginBottom: verticalScale(12) }} />
+        <Shimmer width={'100%'} height={200} />
+      </View>
+    </View>
+  </View>
+);
+
 export default function StatisticsScreen() {
   const { accessToken } = useAuth();
   const [profile, setProfile] = useState<EmployeeProfile | null>(null);
@@ -98,9 +132,11 @@ export default function StatisticsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.COLORS.primary.main} />
-      </View>
+      <SafeAreaView style={styles.container}>
+        <ScrollView style={styles.scrollView}>
+          <StatisticsShimmer />
+        </ScrollView>
+      </SafeAreaView>
     );
   }
 
@@ -342,5 +378,33 @@ const styles = StyleSheet.create({
     fontSize: fontScale(14),
     textAlign: 'center',
     padding: moderateScale(16),
+  },
+  statisticsContainer: {
+    padding: moderateScale(16),
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 12,
+    margin: horizontalScale(16),
+  },
+  statisticsHeader: {
+    marginBottom: verticalScale(16),
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: verticalScale(24),
+  },
+  statCard: {
+    width: '48%',
+    padding: moderateScale(12),
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 8,
+    marginBottom: verticalScale(12),
+  },
+  chartsContainer: {
+    width: '100%',
+  },
+  chartSection: {
+    marginBottom: verticalScale(24),
   },
 }); 

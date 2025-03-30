@@ -374,27 +374,6 @@ export default function HomeScreen() {
 
   const unreadCount = notifications.filter(n => n.status === 'unread').length;
 
-  const renderUpdateCardShimmer = () => (
-    <View style={styles.updateCardContent}>
-      <View style={[styles.updateIconContainer, { marginBottom: verticalScale(12) }]}>
-        <Shimmer width={40} height={40} borderRadius={20} />
-      </View>
-      <View style={styles.updateTextContainer}>
-        <Shimmer 
-          width={80} 
-          height={14} 
-          style={{ marginBottom: verticalScale(4) }} 
-        />
-        <Shimmer 
-          width={60} 
-          height={24} 
-          style={{ marginBottom: verticalScale(4) }} 
-        />
-        <Shimmer width={100} height={12} />
-      </View>
-    </View>
-  );
-
   const renderChatItemShimmer = () => (
     <View style={styles.chatItem}>
       <View style={styles.chatIconContainer}>

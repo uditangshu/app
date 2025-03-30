@@ -1,16 +1,14 @@
-import { Dimensions, Platform, PixelRatio } from 'react-native';
+import { Dimensions, PixelRatio } from 'react-native';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Base dimensions (based on iPhone 11 Pro)
 const baseWidth = 375;
 const baseHeight = 812;
 
-// Scale factors
+
 const widthScale = SCREEN_WIDTH / baseWidth;
 const heightScale = SCREEN_HEIGHT / baseHeight;
 
-// Responsive scaling functions
 export const horizontalScale = (size: number): number => {
   return size * widthScale;
 };

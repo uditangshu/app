@@ -14,6 +14,7 @@ import theme from '../../constants/theme';
 import { horizontalScale, verticalScale, moderateScale, fontScale } from '../../utils/responsive';
 import { useAuth } from '../../contexts/AuthContext';
 import { API_URL } from '../../constants/api';
+import Shimmer from '../components/Shimmer';
 
 interface EmployeeProfile {
   employee_id: string;
@@ -64,6 +65,36 @@ const profileMenuItems: ProfileMenuItem[] = [
   },
 ];
 
+export const ProfileShimmer = () => (
+  <View style={styles.profileContainer}>
+    {/* Profile Header Shimmer */}
+    <View style={styles.profileHeader}>
+      <Shimmer width={60} height={60} borderRadius={30} style={{ marginRight: horizontalScale(12) }} />
+      <View>
+        <Shimmer width={120} height={20} style={{ marginBottom: verticalScale(4) }} />
+        <Shimmer width={80} height={16} />
+      </View>
+    </View>
+
+    {/* Profile Stats Shimmer */}
+    <View style={styles.profileStats}>
+      {[1, 2, 3].map((index) => (
+        <View key={index} style={styles.profileStat}>
+          <Shimmer width={60} height={16} style={{ marginBottom: verticalScale(4) }} />
+          <Shimmer width={40} height={24} />
+        </View>
+      ))}
+    </View>
+
+    {/* Profile Details Shimmer */}
+    <View style={styles.profileDetails}>
+      <Shimmer width={'100%'} height={40} style={{ marginBottom: verticalScale(12) }} />
+      <Shimmer width={'80%'} height={40} style={{ marginBottom: verticalScale(12) }} />
+      <Shimmer width={'90%'} height={40} />
+    </View>
+  </View>
+);
+
 export default function ProfileScreen() {
   const { logout, accessToken } = useAuth();
   const [profile, setProfile] = useState<EmployeeProfile | null>(null);
@@ -108,9 +139,11 @@ export default function ProfileScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.COLORS.primary.main} />
-      </View>
+      <SafeAreaView style={styles.container}>
+        <ScrollView style={styles.scrollView}>
+          <ProfileShimmer />
+        </ScrollView>
+      </SafeAreaView>
     );
   }
 
@@ -331,5 +364,27 @@ const styles = StyleSheet.create({
     fontSize: fontScale(16),
     ...theme.FONTS.medium,
     marginLeft: horizontalScale(8),
+  },
+  profileContainer: {
+    padding: moderateScale(16),
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 12,
+    marginBottom: verticalScale(16),
+  },
+  profileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: verticalScale(16),
+  },
+  profileStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: verticalScale(24),
+  },
+  profileStat: {
+    alignItems: 'center',
+  },
+  profileDetails: {
+    width: '100%',
   },
 }); 
