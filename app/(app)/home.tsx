@@ -119,6 +119,7 @@ export default function HomeScreen() {
   const { theme, isDarkMode } = useTheme();
   const [chats, setChats] = useState<ChatItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isChatVisible, setIsChatVisible] = useState(false);
@@ -151,20 +152,25 @@ export default function HomeScreen() {
         } else {
           Animated.spring(pan, {
             toValue: { x: 0, y: 0 },
-            useNativeDriver: true,
+            useNativeDriver: false,
           }).start();
         }
       },
     })
   ).current;
 
-  
-
-  const fetchChats = async () => {
+  const fetchChats = async (pageNum: number, isLoadMore = false) => {
     try {
-      setLoading(true);
+      if (isLoadMore) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
+
+      console.log(`Fetching chats for page ${pageNum}, isLoadMore: ${isLoadMore}`);
+      
       const response = await fetch(
-        `${API_URL}/employee/chats?page=${page}&limit=${PAGE_SIZE}`,
+        `${API_URL}/employee/chats?page=${pageNum}&limit=${PAGE_SIZE}`,
         {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -173,15 +179,31 @@ export default function HomeScreen() {
       );
       
       if (!response.ok) {
+        console.error('Failed to fetch chats:', response.status, response.statusText);
         throw new Error('Failed to fetch chats');
       }
+
       const data: ChatResponse = await response.json();
-      setChats(prevChats => page === 1 ? data.chats : [...prevChats, ...data.chats]);
-      setHasMore(data.chats.length === PAGE_SIZE);
+      console.log('Received chat data:', data);
+      
+      if (isLoadMore) {
+        setChats(prevChats => {
+          const uniqueChats = data.chats.filter(
+            newChat => !prevChats.some(existingChat => existingChat.chat_id === newChat.chat_id)
+          );
+          return [...prevChats, ...uniqueChats];
+        });
+      } else {
+        setChats(data.chats);
+      }
+
+      setHasMore(data.chats.length >= PAGE_SIZE);
+      setPage(pageNum);
     } catch (error) {
       console.error('Error fetching chats:', error);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
@@ -297,10 +319,9 @@ export default function HomeScreen() {
   };
 
   useEffect(() => {
-    fetchChats();
+    fetchChats(1);
     fetchNotifications(1, true);
     fetchProfile();
-    
     
     const interval = setInterval(() => {
       fetchNotifications(1, true);
@@ -330,8 +351,8 @@ export default function HomeScreen() {
   };
 
   const loadMore = () => {
-    if (!loading && hasMore) {
-      setPage(prev => prev + 1);
+    if (!loading && !loadingMore && hasMore) {
+      fetchChats(page + 1, true);
     }
   };
 
@@ -407,15 +428,6 @@ export default function HomeScreen() {
       >
         <ScrollView 
           style={styles.scrollView}
-          onScroll={({ nativeEvent }) => {
-            const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-            const paddingToBottom = 20;
-            const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
-            if (isCloseToBottom) {
-              loadMore();
-            }
-          }}
-          scrollEventThrottle={400}
         >
           <View style={styles.header}>
             <View>
@@ -604,54 +616,81 @@ export default function HomeScreen() {
                   </View>
                 ))}
               </View>
+            ) : chats.length === 0 ? (
+              <View style={[styles.chatItem, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.8)' }]}>
+                <Text style={[styles.chatMessage, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
+                  No chats found
+                </Text>
+              </View>
             ) : (
               <>
-                {chats.map((chat, index) => (
-                  <TouchableOpacity 
-                    key={chat.chat_id} 
-                    style={[styles.chatItem, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.8)' }]}
-                    onPress={() => showChat(chat.chat_id)}
-                  >
-                    <View style={[styles.chatIconContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.1)' : `${theme.COLORS.primary.main}20` }]}>
-                      <Ionicons 
-                        name={chat.is_escalated ? "warning-outline" : "chatbubble-outline"} 
-                        size={24} 
-                        color={theme.COLORS.primary.main} 
-                      />
-                    </View>
-                    <View style={styles.chatInfo}>
-                      <View style={styles.chatHeader}>
-                        <Text style={[styles.chatTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
-                          {chat.chat_mode === 'ai' ? 'AI Assistant' : 'Human Support'}
-                        </Text>
-                        <Text style={[styles.chatTime, { color: isDarkMode ? 'rgba(255,255,255,0.5)' : theme.COLORS.text.secondary }]}>
-                          {formatDate(chat.last_message_time)}
-                        </Text>
+                {chats.map((chat) => {
+                  const chatItem = (
+                    <TouchableOpacity 
+                      key={chat.chat_id} 
+                      style={[styles.chatItem, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.8)' }]}
+                      onPress={() => {
+                        console.log('Chat pressed:', chat.chat_id);
+                        showChat(chat.chat_id);
+                      }}
+                    >
+                      <View style={[styles.chatIconContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.1)' : `${theme.COLORS.primary.main}20` }]}>
+                        <Ionicons 
+                          name={chat.is_escalated ? "warning-outline" : "chatbubble-outline"} 
+                          size={24} 
+                          color={theme.COLORS.primary.main} 
+                        />
                       </View>
-                      <Text style={[styles.chatMessage, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]} numberOfLines={1}>
-                        {chat.last_message}
-                      </Text>
-                      {chat.unread_count > 0 && (
-                        <View style={[styles.unreadBadge, { backgroundColor: theme.COLORS.primary.main }]}>
-                          <Text style={[styles.unreadBadgeText, { color: theme.COLORS.background.paper }]}>
-                            {chat.unread_count}
+                      <View style={styles.chatInfo}>
+                        <View style={styles.chatHeader}>
+                          <Text style={[styles.chatTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
+                            {chat.chat_mode === 'ai' ? 'AI Assistant' : 'Human Support'}
+                          </Text>
+                          <Text style={[styles.chatTime, { color: isDarkMode ? 'rgba(255,255,255,0.5)' : theme.COLORS.text.secondary }]}>
+                            {formatDate(chat.last_message_time)}
                           </Text>
                         </View>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                ))}
+                        <Text style={[styles.chatMessage, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]} numberOfLines={1}>
+                          {chat.last_message}
+                        </Text>
+                        {chat.unread_count > 0 && (
+                          <View style={[styles.unreadBadge, { backgroundColor: theme.COLORS.primary.main }]}>
+                            <Text style={[styles.unreadBadgeText, { color: theme.COLORS.background.paper }]}>
+                              {chat.unread_count}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                  return chatItem;
+                })}
 
                 {hasMore && (
                   <TouchableOpacity 
-                    style={[styles.loadMoreButton, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.2)' : `${theme.COLORS.primary.main}20` }]} 
-                    onPress={loadMore}
-                    disabled={loading}
+                    style={[styles.loadMoreButton, { 
+                      backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.2)' : `${theme.COLORS.primary.main}20`,
+                      opacity: loadingMore ? 0.7 : 1
+                    }]} 
+                    onPress={() => {
+                      if (!loading && !loadingMore && hasMore) {
+                        fetchChats(page + 1, true);
+                      }
+                    }}
+                    disabled={loadingMore || loading}
                   >
-                    {loading ? (
-                      <ActivityIndicator size="small" color={isDarkMode ? 'white' : theme.COLORS.primary.main} />
+                    {loadingMore ? (
+                      <ActivityIndicator size="small" color={theme.COLORS.primary.main} />
                     ) : (
-                      <Text style={[styles.loadMoreText, { color: isDarkMode ? 'white' : theme.COLORS.primary.main }]}>Load More</Text>
+                      <>
+                        <Text style={[styles.loadMoreText, { color: theme.COLORS.primary.main }]}>Load More</Text>
+                        <Ionicons 
+                          name="chevron-down" 
+                          size={16} 
+                          color={theme.COLORS.primary.main} 
+                          style={{ marginLeft: horizontalScale(4) }}
+                        />
+                      </>
                     )}
                   </TouchableOpacity>
                 )}
@@ -914,14 +953,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadMoreButton: {
-    backgroundColor: 'rgba(28, 141, 58, 0.2)',
     padding: moderateScale(12),
     borderRadius: 8,
     alignItems: 'center',
     marginTop: verticalScale(8),
+    flexDirection: 'row',
+    justifyContent: 'center',
   },
   loadMoreText: {
-    color: 'white',
     fontSize: fontScale(14),
     fontWeight: '500',
   },

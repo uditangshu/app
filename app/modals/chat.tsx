@@ -57,6 +57,16 @@ interface ChatData {
   messages: any[];
 }
 
+interface ChatItem {
+  chat_id: string;
+  last_message: string;
+  last_message_time: string;
+  unread_count: number;
+  total_messages: number;
+  chat_mode: string;
+  is_escalated: boolean;
+}
+
 interface ChatScreenProps {
   onClose: () => void;
   initialChatId?: string | null;
@@ -72,13 +82,17 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
   const [isLoading, setIsLoading] = useState(true);
   const [activeSession, setActiveSession] = useState<ScheduledSession | null>(null);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(initialChatId || null);
-  const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
+  const [chatHistory, setChatHistory] = useState<ChatItem[]>([]);
   const flatListRef = useRef<FlatList>(null);
   const router = useRouter();
 
   useEffect(() => {
-    fetchAllChats();
-  }, []);
+    if (initialChatId) {
+      setSelectedChatId(initialChatId);
+      loadChatMessages(initialChatId);
+    }
+    fetchChatHistory();
+  }, [initialChatId]);
 
   const handleAuthError = async (error: any) => {
     if (error.message === 'Failed to fetch scheduled sessions' || 
@@ -97,7 +111,35 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
     return false;
   };
 
-  const fetchAllChats = async () => {
+  const fetchChatHistory = async () => {
+    if (!accessToken) {
+      console.error('No access token available');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/employee/chats`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch chat history');
+      }
+
+      const data = await response.json();
+      setChatHistory(data.chats);
+    } catch (error) {
+      console.error('Error fetching chat history:', error);
+      const shouldRetry = await handleAuthError(error);
+      if (shouldRetry) {
+        fetchChatHistory();
+      }
+    }
+  };
+
+  const loadChatMessages = async (chatId: string) => {
     if (!accessToken) {
       console.error('No access token available');
       setIsLoading(false);
@@ -106,40 +148,46 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
 
     try {
       setIsLoading(true);
-      const response = await fetch(`${API_URL}/employee/chats`, {
+      const response = await fetch(`${API_URL}/employee/chats/${chatId}/messages`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
         },
       });
-
+      
       if (!response.ok) {
-        throw new Error('Failed to fetch chats');
+        throw new Error('Failed to load chat messages');
       }
 
       const data = await response.json();
-      const formattedChats = data.chats.map((chat: ChatData) => ({
-        id: chat.id,
-        lastMessage: chat.last_message || 'No messages yet',
-        timestamp: new Date(chat.created_at),
-        unreadCount: chat.unread_count || 0,
-        messages: chat.messages || [],
+      console.log('Received messages:', data); // Debug log
+
+      if (!data.messages || !Array.isArray(data.messages)) {
+        console.error('Invalid messages format:', data);
+        return;
+      }
+
+      const formattedMessages = data.messages.map((msg: any) => ({
+        id: String(Date.now() + Math.random()),
+        text: msg.text || '',
+        isUser: msg.sender === "emp",
+        timestamp: new Date(msg.timestamp || Date.now()),
       }));
 
-      setChatHistory(formattedChats);
-      
-      // If there's an initial chat ID, load its messages
-      if (initialChatId) {
-        const selectedChat = formattedChats.find((chat: ChatData) => chat.id === initialChatId);
-        if (selectedChat) {
-          setSelectedChatId(initialChatId);
-          setMessages(selectedChat.messages);
-        }
-      }
+      console.log('Formatted messages:', formattedMessages); // Debug log
+      setMessages(formattedMessages);
+      scrollToBottom();
+
+      // Update unread count in chat history
+      setChatHistory(prev => prev.map(chat => 
+        chat.chat_id === chatId 
+          ? { ...chat, unread_count: 0 }
+          : chat
+      ));
     } catch (error) {
-      console.error('Error fetching chats:', error);
+      console.error('Error loading chat messages:', error);
       const shouldRetry = await handleAuthError(error);
       if (shouldRetry) {
-        fetchAllChats();
+        loadChatMessages(chatId);
       }
     } finally {
       setIsLoading(false);
@@ -150,42 +198,7 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
     setSelectedChatId(chatId);
     setActiveSession(null);
     setIsSidebarOpen(false);
-
-    try {
-      const response = await fetch(`${API_URL}/employee/chats/${chatId}/messages`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to load chat messages');
-      }
-
-      const data = await response.json();
-      const formattedMessages = data.messages.map((msg: any) => ({
-        id: String(Date.now() + Math.random()),
-        text: msg.text,
-        isUser: msg.sender === "emp",
-        timestamp: new Date(msg.timestamp),
-      }));
-
-      setMessages(formattedMessages);
-      scrollToBottom();
-
-      // Update chat history with new messages
-      setChatHistory(prev => prev.map(chat => 
-        chat.id === chatId 
-          ? { ...chat, messages: formattedMessages, lastMessage: formattedMessages[formattedMessages.length - 1]?.text || chat.lastMessage }
-          : chat
-      ));
-    } catch (error) {
-      console.error('Error loading chat messages:', error);
-      const shouldRetry = await handleAuthError(error);
-      if (shouldRetry) {
-        handleChatSelect(chatId);
-      }
-    }
+    await loadChatMessages(chatId);
   };
 
   const sendMessage = async () => {
@@ -198,7 +211,9 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
       timestamp: new Date(),
     };
 
+    // Immediately add the user's message to the UI
     setMessages(prev => [...prev, newMessage]);
+    const currentText = inputText.trim();
     setInputText('');
     scrollToBottom();
 
@@ -210,7 +225,7 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
           'Authorization': `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
-          message: inputText.trim(),
+          message: currentText,
           session_id: activeSession?.session_id,
           chat_id: selectedChatId,
           sender: "emp"
@@ -222,6 +237,7 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
       }
 
       const data = await response.json();
+      console.log('Bot response:', data); // Debug log
       
       const aiResponse: Message = {
         id: (Date.now() + 1).toString(),
@@ -233,14 +249,14 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
       setMessages(prev => [...prev, aiResponse]);
       scrollToBottom();
 
-      // Update chat history with new messages
+      // Update chat history
       setChatHistory(prev => prev.map(chat => 
-        chat.id === selectedChatId 
+        chat.chat_id === selectedChatId 
           ? { 
               ...chat, 
-              messages: [...chat.messages, newMessage, aiResponse],
-              lastMessage: aiResponse.text,
-              unreadCount: 0
+              last_message: aiResponse.text,
+              last_message_time: aiResponse.timestamp.toISOString(),
+              unread_count: 0
             }
           : chat
       ));
@@ -248,11 +264,10 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
       console.error('Error sending message:', error);
       const shouldRetry = await handleAuthError(error);
       if (shouldRetry) {
-        sendMessage();
-      } else {
+        // Don't resend the message automatically, just show error
         const errorMessage: Message = {
           id: (Date.now() + 1).toString(),
-          text: 'Sorry, there was an error processing your message. Please try again.',
+          text: 'Sorry, there was an error sending your message. Please try again.',
           isUser: false,
           timestamp: new Date(),
         };
@@ -301,45 +316,51 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
         ]}>
           {item.text}
         </Text>
-        <Text style={[
-          styles.timestamp,
-          { color: item.isUser ? 'rgba(255,255,255,0.7)' : (isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)') }
-        ]}>
-          {item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        </Text>
+        <View style={styles.messageFooter}>
+          <Text style={[
+            styles.timestamp,
+            { color: item.isUser ? 'rgba(255,255,255,0.7)' : (isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)') }
+          ]}>
+            {item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </Text>
+          <Text style={[
+            styles.messageId,
+            { color: item.isUser ? 'rgba(255,255,255,0.7)' : (isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)') }
+          ]}>
+            ID: {item.id}
+          </Text>
+        </View>
       </View>
     </View>
   );
 
-  const renderChatHistoryItem = ({ item }: { item: ChatHistory }) => (
-    <TouchableOpacity 
+  const renderChatHistoryItem = ({ item }: { item: ChatItem }) => (
+    <TouchableOpacity
       style={[
         styles.chatHistoryItem,
-        selectedChatId === item.id && styles.selectedChatItem
+        selectedChatId === item.chat_id && styles.selectedChatItem,
+        { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }
       ]}
-      onPress={() => handleChatSelect(item.id)}
+      onPress={() => handleChatSelect(item.chat_id)}
     >
       <View style={styles.chatHistoryContent}>
-        <Text style={styles.chatHistoryId}>Chat #{item.id}</Text>
-        <Text style={styles.chatHistoryMessage} numberOfLines={1}>
-          {item.lastMessage}
+        <Text style={[styles.chatHistoryTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
+          {item.chat_mode === 'ai' ? 'AI Assistant' : 'Human Support'}
         </Text>
-        <Text style={styles.chatHistoryTimestamp}>
-          {item.timestamp.toLocaleDateString()}
+        <Text 
+          style={[styles.chatHistoryMessage, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}
+          numberOfLines={1}
+        >
+          {item.last_message}
         </Text>
+        {item.unread_count > 0 && (
+          <View style={[styles.unreadBadge, { backgroundColor: theme.COLORS.primary.main }]}>
+            <Text style={styles.unreadCount}>{item.unread_count}</Text>
+          </View>
+        )}
       </View>
-      {item.unreadCount > 0 && (
-        <View style={styles.unreadBadge}>
-          <Text style={styles.unreadCount}>{item.unreadCount}</Text>
-        </View>
-      )}
     </TouchableOpacity>
   );
-
-  // Toggle sidebar without animation
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
 
   if (isLoading) {
     return (
@@ -359,11 +380,15 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
           backgroundColor: isDarkMode ? 'rgba(0,0,0,0.8)' : 'white',
           borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
         }]}>
-          <TouchableOpacity onPress={toggleSidebar} style={styles.menuButton}>
+          <TouchableOpacity onPress={() => setIsSidebarOpen(true)} style={styles.menuButton}>
             <Ionicons name="menu" size={24} color={isDarkMode ? 'white' : theme.COLORS.text.primary} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
-            {selectedChatId ? `Chat #${selectedChatId}` : 'New Chat'}
+            {selectedChatId ? 
+              `${chatHistory.find(chat => chat.chat_id === selectedChatId)?.chat_mode === 'ai' ? 
+                'AI Assistant' : 'Human Support'} (ID: ${selectedChatId})`
+              : 'New Chat'
+            }
           </Text>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <Ionicons name="close" size={24} color={isDarkMode ? 'white' : theme.COLORS.text.primary} />
@@ -374,24 +399,43 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
           <View style={[styles.noSessionContainer, { 
             backgroundColor: isDarkMode ? '#121212' : '#F5F5F5' 
           }]}>
-            <Ionicons name="calendar-outline" size={48} color={theme.COLORS.text.secondary} />
-            <Text style={styles.noSessionTitle}>No Active Session</Text>
-            <Text style={styles.noSessionText}>
-              You don't have any scheduled chat sessions at the moment.
+            <Ionicons name="chatbubbles-outline" size={48} color={theme.COLORS.text.secondary} />
+            <Text style={[styles.noSessionTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
+              Start a New Chat
+            </Text>
+            <Text style={[styles.noSessionText, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
+              Select a chat from history or start a new conversation
             </Text>
           </View>
         ) : (
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            renderItem={renderMessage}
-            keyExtractor={item => item.id}
-            contentContainerStyle={[styles.messageList, {
-              backgroundColor: isDarkMode ? '#121212' : '#F5F5F5'
-            }]}
-            onContentSizeChange={scrollToBottom}
-            onLayout={scrollToBottom}
-          />
+          <>
+            {isLoading ? (
+              <View style={[styles.loadingContainer, { backgroundColor: isDarkMode ? '#121212' : '#F5F5F5' }]}>
+                <ActivityIndicator size="large" color={theme.COLORS.primary.main} />
+              </View>
+            ) : (
+              <FlatList
+                ref={flatListRef}
+                data={messages}
+                renderItem={renderMessage}
+                keyExtractor={item => item.id}
+                contentContainerStyle={[styles.messageList, {
+                  backgroundColor: isDarkMode ? '#121212' : '#F5F5F5',
+                  flexGrow: 1,
+                  paddingBottom: verticalScale(16)
+                }]}
+                onContentSizeChange={scrollToBottom}
+                onLayout={scrollToBottom}
+                ListEmptyComponent={() => (
+                  <View style={styles.emptyContainer}>
+                    <Text style={[styles.emptyText, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
+                      No messages yet. Start a conversation!
+                    </Text>
+                  </View>
+                )}
+              />
+            )}
+          </>
         )}
 
         {(!isReadOnly && (activeSession || selectedChatId)) && (
@@ -437,17 +481,29 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
 
       {/* Sidebar */}
       {isSidebarOpen && (
-        <View style={styles.sidebar}>
-          <View style={styles.sidebarHeader}>
-            <Text style={styles.sidebarTitle}>Chat History</Text>
-            <TouchableOpacity onPress={toggleSidebar}>
-              <Ionicons name="close" size={24} color={theme.COLORS.text.primary} />
+        <View style={[styles.sidebar, {
+          backgroundColor: isDarkMode ? 'rgba(0,0,0,0.95)' : 'rgba(255,255,255,0.95)',
+          borderRightColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+          borderRightWidth: 1,
+        }]}>
+          <View style={[styles.sidebarHeader, {
+            borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+          }]}>
+            <Text style={[styles.sidebarTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
+              Chat History
+            </Text>
+            <TouchableOpacity onPress={() => setIsSidebarOpen(false)}>
+              <Ionicons 
+                name="close" 
+                size={24} 
+                color={isDarkMode ? 'white' : theme.COLORS.text.primary} 
+              />
             </TouchableOpacity>
           </View>
           <FlatList
             data={chatHistory}
             renderItem={renderChatHistoryItem}
-            keyExtractor={item => item.id}
+            keyExtractor={item => item.chat_id}
             contentContainerStyle={styles.chatHistoryList}
           />
         </View>
@@ -488,8 +544,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     bottom: 0,
-    width: Dimensions.get('window').width * 0.8,
-    backgroundColor: theme.COLORS.background.paper,
+    width: '80%',
     zIndex: 1000,
     elevation: 5,
     shadowColor: '#000',
@@ -503,61 +558,54 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: moderateScale(16),
     borderBottomWidth: 1,
-    borderBottomColor: theme.COLORS.border.main,
   },
   sidebarTitle: {
     fontSize: fontScale(20),
-    color: theme.COLORS.text.primary,
-    ...theme.FONTS.medium,
+    fontWeight: '600',
   },
   chatHistoryList: {
     padding: moderateScale(16),
   },
   chatHistoryItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: moderateScale(12),
-    borderBottomWidth: 1,
-    borderBottomColor: theme.COLORS.border.main,
+    padding: moderateScale(16),
+    borderRadius: 8,
+    marginBottom: verticalScale(8),
   },
   chatHistoryContent: {
     flex: 1,
-    marginRight: horizontalScale(12),
   },
-  chatHistoryId: {
+  chatIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chatHistoryTitle: {
     fontSize: fontScale(16),
-    color: theme.COLORS.text.primary,
-    ...theme.FONTS.medium,
-    marginBottom: verticalScale(4),
+    fontWeight: '500',
   },
   chatHistoryMessage: {
     fontSize: fontScale(14),
-    color: theme.COLORS.text.secondary,
-    ...theme.FONTS.regular,
   },
   chatHistoryTimestamp: {
     fontSize: fontScale(12),
-    color: theme.COLORS.text.secondary,
-    ...theme.FONTS.regular,
-    marginTop: verticalScale(4),
   },
   unreadBadge: {
-    backgroundColor: theme.COLORS.primary.main,
+    paddingHorizontal: horizontalScale(8),
+    paddingVertical: verticalScale(4),
     borderRadius: 12,
     minWidth: 24,
-    height: 24,
-    justifyContent: 'center',
     alignItems: 'center',
-    padding: moderateScale(4),
   },
   unreadCount: {
     color: 'white',
     fontSize: fontScale(12),
-    ...theme.FONTS.medium,
+    fontWeight: 'bold',
   },
   messageList: {
     padding: moderateScale(16),
+    flexGrow: 1,
   },
   messageContainer: {
     maxWidth: '80%',
@@ -641,7 +689,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   selectedChatItem: {
-  backgroundColor: theme.COLORS.background.paper,
+    backgroundColor: 'rgba(28, 141, 58, 0.1)',
   },
   profileCircle: {
     width: 32,
@@ -651,5 +699,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: horizontalScale(8),
     marginTop: verticalScale(4),
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: verticalScale(32),
+  },
+  emptyText: {
+    fontSize: fontScale(16),
+    textAlign: 'center',
+  },
+  selectedChat: {
+    backgroundColor: 'rgba(28, 141, 58, 0.1)',
+  },
+  unreadBadgeText: {
+    color: 'white',
+    fontSize: fontScale(12),
+    fontWeight: 'bold',
+  },
+  messageFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: verticalScale(4),
+  },
+  messageId: {
+    fontSize: fontScale(10),
+    ...theme.FONTS.regular,
   },
 }); 

@@ -71,39 +71,131 @@ interface EmployeeProfile {
   };
 }
 
-export const StatisticsShimmer = () => (
-  <View style={styles.statisticsContainer}>
-    {/* Header Shimmer */}
-    <View style={styles.statisticsHeader}>
-      <Shimmer width={150} height={24} style={{ marginBottom: verticalScale(8) }} />
-      <Shimmer width={200} height={16} />
-    </View>
+export const StatisticsShimmer = () => {
+  const { theme, isDarkMode } = useTheme();
+  
+  const sectionStyle = {
+    backgroundColor: isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.9)',
+    padding: horizontalScale(16),
+    marginHorizontal: horizontalScale(16),
+    borderRadius: 12,
+  };
 
-    {/* Stats Grid Shimmer */}
-    <View style={styles.statsGrid}>
-      {[1, 2, 3, 4].map((index) => (
-        <View key={index} style={styles.statCard}>
-          <Shimmer width={40} height={40} borderRadius={20} style={{ marginBottom: verticalScale(8) }} />
-          <Shimmer width={80} height={16} style={{ marginBottom: verticalScale(4) }} />
-          <Shimmer width={60} height={24} style={{ marginBottom: verticalScale(4) }} />
-          <Shimmer width={100} height={12} />
+  const cardStyle = {
+    backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.8)',
+    padding: moderateScale(16),
+    borderRadius: 12,
+    marginBottom: verticalScale(12),
+  };
+
+  return (
+    <ScrollView style={styles.scrollView}>
+      {/* Header Shimmer */}
+      <View style={styles.header}>
+        <Shimmer 
+          width={180} 
+          height={32} 
+          style={{ marginBottom: verticalScale(8) }}
+        />
+        <Shimmer 
+          width={240} 
+          height={20}
+        />
+      </View>
+
+      {/* Activity Section Shimmer */}
+      <View style={[sectionStyle, { marginTop: 0 }]}>
+        <View style={styles.sectionHeader}>
+          <Shimmer width={24} height={24} borderRadius={12} />
+          <Shimmer 
+            width={120} 
+            height={24} 
+            style={{ marginLeft: horizontalScale(8) }}
+          />
         </View>
-      ))}
-    </View>
+        {[1, 2].map((index) => (
+          <View key={`activity-shimmer-${index}`} style={cardStyle}>
+            <Shimmer 
+              width={120} 
+              height={16} 
+              style={{ marginBottom: verticalScale(12) }}
+            />
+            <View style={styles.activityStats}>
+              {[1, 2, 3].map((statIndex) => (
+                <View key={`stat-${statIndex}`} style={styles.activityStat}>
+                  <View style={[styles.iconContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.1)' : `${theme.COLORS.primary.main}20` }]}>
+                    <Shimmer width={20} height={20} borderRadius={10} />
+                  </View>
+                  <Shimmer 
+                    width={40} 
+                    height={24} 
+                    style={{ marginVertical: verticalScale(4) }}
+                  />
+                  <Shimmer width={60} height={12} />
+                </View>
+              ))}
+            </View>
+          </View>
+        ))}
+      </View>
 
-    {/* Charts Shimmer */}
-    <View style={styles.chartsContainer}>
-      <View style={styles.chartSection}>
-        <Shimmer width={120} height={20} style={{ marginBottom: verticalScale(12) }} />
-        <Shimmer width={'100%'} height={200} />
+      {/* Performance Review Section Shimmer */}
+      <View style={sectionStyle}>
+        <View style={styles.sectionHeader}>
+          <Shimmer width={24} height={24} borderRadius={12} />
+          <Shimmer 
+            width={160} 
+            height={24} 
+            style={{ marginLeft: horizontalScale(8) }}
+          />
+        </View>
+        {[1, 2].map((index) => (
+          <View key={`review-shimmer-${index}`} style={cardStyle}>
+            <View style={styles.reviewHeader}>
+              <Shimmer width={140} height={20} />
+              <View style={[styles.ratingContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.2)' : `${theme.COLORS.primary.main}30` }]}>
+                <Shimmer width={40} height={20} />
+              </View>
+            </View>
+            <Shimmer 
+              width={'100%'} 
+              height={60} 
+              style={{ marginTop: verticalScale(8) }}
+            />
+            <View style={[styles.promotionBadge, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.2)' : `${theme.COLORS.primary.main}30` }]}>
+              <Shimmer width={120} height={20} />
+            </View>
+          </View>
+        ))}
       </View>
-      <View style={styles.chartSection}>
-        <Shimmer width={140} height={20} style={{ marginBottom: verticalScale(12) }} />
-        <Shimmer width={'100%'} height={200} />
+
+      {/* Leave History Section Shimmer */}
+      <View style={[sectionStyle, { marginBottom: verticalScale(24) }]}>
+        <View style={styles.sectionHeader}>
+          <Shimmer width={24} height={24} borderRadius={12} />
+          <Shimmer 
+            width={120} 
+            height={24} 
+            style={{ marginLeft: horizontalScale(8) }}
+          />
+        </View>
+        {[1, 2].map((index) => (
+          <View key={`leave-shimmer-${index}`} style={cardStyle}>
+            <View style={styles.leaveHeader}>
+              <Shimmer width={120} height={20} />
+              <Shimmer width={60} height={16} />
+            </View>
+            <Shimmer 
+              width={200} 
+              height={14} 
+              style={{ marginTop: verticalScale(4) }}
+            />
+          </View>
+        ))}
       </View>
-    </View>
-  </View>
-);
+    </ScrollView>
+  );
+};
 
 export default function StatisticsScreen() {
   const { accessToken } = useAuth();
@@ -219,7 +311,7 @@ export default function StatisticsScreen() {
         <Text style={[styles.sectionTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>Performance Review</Text>
       </View>
       {profile?.company_data.performance.map((review, index) => (
-        <View key={index} style={[styles.reviewCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.8)' }]}>
+        <View key={`performance-${review.Review_Period}-${index}`} style={[styles.reviewCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.8)' }]}>
           <View style={styles.reviewHeader}>
             <Text style={[styles.reviewPeriod, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
               {review.Review_Period}
@@ -253,7 +345,7 @@ export default function StatisticsScreen() {
         <Text style={[styles.sectionTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>Vibe Meter</Text>
       </View>
       {profile?.company_data.vibemeter.map((vibe, index) => (
-        <View key={index} style={[styles.vibeCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.8)' }]}>
+        <View key={`vibe-${vibe.Response_Date}-${index}`} style={[styles.vibeCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.8)' }]}>
           <Text style={[styles.vibeDate, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
             {new Date(vibe.Response_Date).toLocaleDateString()}
           </Text>
@@ -278,86 +370,58 @@ export default function StatisticsScreen() {
         style={styles.gradientBackground}
       >
         <ScrollView style={styles.scrollView}>
-          <View style={styles.header}>
-            <Text style={[styles.headerTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>Statistics</Text>
-            <Text style={[styles.headerSubtitle, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
-              Your performance metrics
-            </Text>
-          </View>
-
-          <View style={styles.statsGrid}>
-            {loading ? (
-              <>
-                {renderShimmerCard()}
-                {renderShimmerCard()}
-                {renderShimmerCard()}
-                {renderShimmerCard()}
-              </>
-            ) : profile ? (
-              <>
-                {renderStatCard(
-                  'Mood Score',
-                  profile.mood_stats.average_score.toFixed(1),
-                  'happy-outline',
-                  `${profile.mood_stats.total_sessions} sessions`
-                )}
-                {renderStatCard(
-                  'Performance',
-                  `${profile.company_data.performance[0]?.Performance_Rating || 0}/5`,
-                  'trophy-outline',
-                  profile.company_data.performance[0]?.Manager_Feedback
-                )}
-                {renderStatCard(
-                  'Work Hours',
-                  `${profile.company_data.activity[0]?.Work_Hours || 0}h`,
-                  'time-outline',
-                  `${profile.company_data.activity[0]?.Meetings_Attended || 0} meetings`
-                )}
-                {renderStatCard(
-                  'Vibe Score',
-                  `${profile.company_data.vibemeter[0]?.Vibe_Score || 0}/5`,
-                  'trending-up-outline',
-                  'Last 30 days'
-                )}
-              </>
-            ) : null}
-          </View>
-
-          {/* Activity Section */}
-          <View style={[styles.section, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.9)' }]}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="analytics-outline" size={24} color={isDarkMode ? 'white' : theme.COLORS.primary.main} />
-              <Text style={[styles.sectionTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>Recent Activity</Text>
-            </View>
-            {profile?.company_data.activity.map((activity, index) => renderActivityCard(activity))}
-          </View>
-
-          {/* Performance Review Section */}
-          {renderPerformanceSection()}
-
-          {/* Vibe Meter Section */}
-          {renderVibeSection()}
-
-          {/* Leave History Section */}
-          <View style={[styles.section, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.9)' }]}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="calendar-outline" size={24} color={isDarkMode ? 'white' : theme.COLORS.primary.main} />
-              <Text style={[styles.sectionTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>Leave History</Text>
-            </View>
-            {profile?.company_data.leave.map((leave, index) => (
-              <View key={index} style={[styles.leaveItem, { backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.8)' }]}>
-                <View style={styles.leaveHeader}>
-                  <Text style={[styles.leaveType, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>{leave.Leave_Type}</Text>
-                  <Text style={[styles.leaveDays, { color: isDarkMode ? 'rgba(255, 255, 255, 0.7)' : theme.COLORS.text.secondary }]}>
-                    {leave.Leave_Days} days
-                  </Text>
-                </View>
-                <Text style={[styles.leaveDate, { color: isDarkMode ? 'rgba(255, 255, 255, 0.5)' : theme.COLORS.text.secondary }]}>
-                  {new Date(leave.Leave_Start_Date).toLocaleDateString()} - {new Date(leave.Leave_End_Date).toLocaleDateString()}
+          {loading ? (
+            <StatisticsShimmer />
+          ) : (
+            <>
+              <View style={styles.header}>
+                <Text style={[styles.headerTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>Statistics</Text>
+                <Text style={[styles.headerSubtitle, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
+                  Your performance metrics
                 </Text>
               </View>
-            ))}
-          </View>
+
+              {/* Activity Section */}
+              <View style={[styles.section, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.9)', marginTop: 0 }]}>
+                <View style={styles.sectionHeader}>
+                  <Ionicons name="analytics-outline" size={24} color={isDarkMode ? 'white' : theme.COLORS.primary.main} />
+                  <Text style={[styles.sectionTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>Recent Activity</Text>
+                </View>
+                {profile?.company_data.activity.map((activity, index) => (
+                  <View key={`activity-${activity.Date}-${index}`}>
+                    {renderActivityCard(activity)}
+                  </View>
+                ))}
+              </View>
+
+              {/* Performance Review Section */}
+              {renderPerformanceSection()}
+
+              {/* Vibe Meter Section */}
+              {renderVibeSection()}
+
+              {/* Leave History Section */}
+              <View style={[styles.section, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.9)', marginBottom: verticalScale(24) }]}>
+                <View style={styles.sectionHeader}>
+                  <Ionicons name="calendar-outline" size={24} color={isDarkMode ? 'white' : theme.COLORS.primary.main} />
+                  <Text style={[styles.sectionTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>Leave History</Text>
+                </View>
+                {profile?.company_data.leave.map((leave, index) => (
+                  <View key={`leave-${leave.Leave_Start_Date}-${index}`} style={[styles.leaveItem, { backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.8)' }]}>
+                    <View style={styles.leaveHeader}>
+                      <Text style={[styles.leaveType, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>{leave.Leave_Type}</Text>
+                      <Text style={[styles.leaveDays, { color: isDarkMode ? 'rgba(255, 255, 255, 0.7)' : theme.COLORS.text.secondary }]}>
+                        {leave.Leave_Days} days
+                      </Text>
+                    </View>
+                    <Text style={[styles.leaveDate, { color: isDarkMode ? 'rgba(255, 255, 255, 0.5)' : theme.COLORS.text.secondary }]}>
+                      {new Date(leave.Leave_Start_Date).toLocaleDateString()} - {new Date(leave.Leave_End_Date).toLocaleDateString()}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
         </ScrollView>
       </LinearGradient>
     </SafeAreaView>
@@ -377,6 +441,7 @@ const styles = StyleSheet.create({
   header: {
     padding: horizontalScale(16),
     paddingTop: verticalScale(24),
+    paddingBottom: verticalScale(16),
   },
   headerTitle: {
     fontSize: fontScale(28),
@@ -422,7 +487,7 @@ const styles = StyleSheet.create({
   section: {
     padding: horizontalScale(16),
     marginHorizontal: horizontalScale(16),
-    marginTop: verticalScale(16),
+    marginTop: verticalScale(24),
     borderRadius: 12,
   },
   sectionHeader: {

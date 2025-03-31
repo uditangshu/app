@@ -166,7 +166,11 @@ export default function ProfileScreen() {
         <ScrollView style={styles.scrollView}>
           {/* Profile Header */}
           <View style={styles.header}>
-            <View style={[styles.circleContainer, { backgroundColor: theme.COLORS.primary.main }]}>
+            <View style={[styles.circleContainer, { 
+              backgroundColor: theme.COLORS.primary.main,
+              borderWidth: isDarkMode ? 4 : 0,
+              borderColor: 'rgba(0, 0, 0, 0.5)'
+            }]}>
               <Text style={[styles.employeeId, { color: theme.COLORS.background.paper }]}>
                 {profile.employee_id}
               </Text>
