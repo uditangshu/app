@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -166,6 +167,110 @@ export default function StatisticsScreen() {
     </View>
   );
 
+  const renderActivityCard = (activity: any) => (
+    <View style={[styles.activityCard, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.9)' }]}>
+      <View style={styles.activityHeader}>
+        <Text style={[styles.activityDate, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
+          {new Date(activity.Date).toLocaleDateString()}
+        </Text>
+      </View>
+      <View style={styles.activityStats}>
+        <View style={styles.activityStat}>
+          <View style={[styles.iconContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.1)' : `${theme.COLORS.primary.main}20` }]}>
+            <Ionicons name="chatbubbles-outline" size={20} color={theme.COLORS.primary.main} />
+          </View>
+          <Text style={[styles.activityValue, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
+            {activity.Teams_Messages_Sent}
+          </Text>
+          <Text style={[styles.activityLabel, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
+            Messages
+          </Text>
+        </View>
+        <View style={styles.activityStat}>
+          <View style={[styles.iconContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.1)' : `${theme.COLORS.primary.main}20` }]}>
+            <Ionicons name="mail-outline" size={20} color={theme.COLORS.primary.main} />
+          </View>
+          <Text style={[styles.activityValue, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
+            {activity.Emails_Sent}
+          </Text>
+          <Text style={[styles.activityLabel, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
+            Emails
+          </Text>
+        </View>
+        <View style={styles.activityStat}>
+          <View style={[styles.iconContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.1)' : `${theme.COLORS.primary.main}20` }]}>
+            <Ionicons name="people-outline" size={20} color={theme.COLORS.primary.main} />
+          </View>
+          <Text style={[styles.activityValue, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
+            {activity.Meetings_Attended}
+          </Text>
+          <Text style={[styles.activityLabel, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
+            Meetings
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+
+  const renderPerformanceSection = () => (
+    <View style={[styles.section, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.9)' }]}>
+      <View style={styles.sectionHeader}>
+        <Ionicons name="trophy-outline" size={24} color={isDarkMode ? 'white' : theme.COLORS.primary.main} />
+        <Text style={[styles.sectionTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>Performance Review</Text>
+      </View>
+      {profile?.company_data.performance.map((review, index) => (
+        <View key={index} style={[styles.reviewCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.8)' }]}>
+          <View style={styles.reviewHeader}>
+            <Text style={[styles.reviewPeriod, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
+              {review.Review_Period}
+            </Text>
+            <View style={[styles.ratingContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.2)' : `${theme.COLORS.primary.main}30` }]}>
+              <Text style={[styles.ratingText, { color: theme.COLORS.primary.main }]}>
+                {review.Performance_Rating}/5
+              </Text>
+            </View>
+          </View>
+          <Text style={[styles.reviewFeedback, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
+            {review.Manager_Feedback}
+          </Text>
+          {review.Promotion_Consideration && (
+            <View style={[styles.promotionBadge, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.2)' : `${theme.COLORS.primary.main}30` }]}>
+              <Ionicons name="trending-up" size={16} color={theme.COLORS.primary.main} />
+              <Text style={[styles.promotionText, { color: theme.COLORS.primary.main }]}>
+                Promotion Consideration
+              </Text>
+            </View>
+          )}
+        </View>
+      ))}
+    </View>
+  );
+
+  const renderVibeSection = () => (
+    <View style={[styles.section, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.9)' }]}>
+      <View style={styles.sectionHeader}>
+        <Ionicons name="pulse-outline" size={24} color={isDarkMode ? 'white' : theme.COLORS.primary.main} />
+        <Text style={[styles.sectionTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>Vibe Meter</Text>
+      </View>
+      {profile?.company_data.vibemeter.map((vibe, index) => (
+        <View key={index} style={[styles.vibeCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.8)' }]}>
+          <Text style={[styles.vibeDate, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
+            {new Date(vibe.Response_Date).toLocaleDateString()}
+          </Text>
+          <View style={styles.vibeScoreContainer}>
+            <View style={[styles.vibeScore, { 
+              backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.2)' : `${theme.COLORS.primary.main}30`,
+              width: `${(vibe.Vibe_Score / 5) * 100}%`
+            }]} />
+          </View>
+          <Text style={[styles.vibeScoreText, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
+            {vibe.Vibe_Score}/5
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.COLORS.background.default }]}>
       <LinearGradient
@@ -218,6 +323,22 @@ export default function StatisticsScreen() {
             ) : null}
           </View>
 
+          {/* Activity Section */}
+          <View style={[styles.section, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.9)' }]}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="analytics-outline" size={24} color={isDarkMode ? 'white' : theme.COLORS.primary.main} />
+              <Text style={[styles.sectionTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>Recent Activity</Text>
+            </View>
+            {profile?.company_data.activity.map((activity, index) => renderActivityCard(activity))}
+          </View>
+
+          {/* Performance Review Section */}
+          {renderPerformanceSection()}
+
+          {/* Vibe Meter Section */}
+          {renderVibeSection()}
+
+          {/* Leave History Section */}
           <View style={[styles.section, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.9)' }]}>
             <View style={styles.sectionHeader}>
               <Ionicons name="calendar-outline" size={24} color={isDarkMode ? 'white' : theme.COLORS.primary.main} />
@@ -349,5 +470,98 @@ const styles = StyleSheet.create({
   },
   chartSection: {
     marginBottom: verticalScale(24),
+  },
+  activityCard: {
+    padding: moderateScale(16),
+    borderRadius: 12,
+    marginBottom: verticalScale(12),
+  },
+  activityHeader: {
+    marginBottom: verticalScale(12),
+  },
+  activityDate: {
+    fontSize: fontScale(14),
+    fontWeight: '500',
+  },
+  activityStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  activityStat: {
+    alignItems: 'center',
+  },
+  activityValue: {
+    fontSize: fontScale(20),
+    fontWeight: '700',
+    marginVertical: verticalScale(4),
+  },
+  activityLabel: {
+    fontSize: fontScale(12),
+  },
+  reviewCard: {
+    padding: moderateScale(16),
+    borderRadius: 12,
+    marginBottom: verticalScale(12),
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: verticalScale(8),
+  },
+  reviewPeriod: {
+    fontSize: fontScale(16),
+    fontWeight: '500',
+  },
+  ratingContainer: {
+    paddingHorizontal: horizontalScale(12),
+    paddingVertical: verticalScale(4),
+    borderRadius: 16,
+  },
+  ratingText: {
+    fontSize: fontScale(14),
+    fontWeight: '600',
+  },
+  reviewFeedback: {
+    fontSize: fontScale(14),
+    lineHeight: 20,
+  },
+  promotionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: horizontalScale(12),
+    paddingVertical: verticalScale(4),
+    borderRadius: 16,
+    marginTop: verticalScale(12),
+    alignSelf: 'flex-start',
+  },
+  promotionText: {
+    fontSize: fontScale(12),
+    fontWeight: '600',
+    marginLeft: horizontalScale(4),
+  },
+  vibeCard: {
+    padding: moderateScale(16),
+    borderRadius: 12,
+    marginBottom: verticalScale(12),
+  },
+  vibeDate: {
+    fontSize: fontScale(14),
+    marginBottom: verticalScale(8),
+  },
+  vibeScoreContainer: {
+    height: verticalScale(8),
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  vibeScore: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  vibeScoreText: {
+    fontSize: fontScale(16),
+    fontWeight: '600',
+    marginTop: verticalScale(8),
   },
 }); 
