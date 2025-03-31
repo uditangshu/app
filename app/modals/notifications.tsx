@@ -1,17 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  ActivityIndicator,
   Modal,
+  TouchableOpacity,
+  ScrollView,
+  SafeAreaView,
+  Animated,
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../../constants/theme';
-import { fontScale, horizontalScale, moderateScale, verticalScale } from '../../utils/responsive';
+import { useTheme } from '../../contexts/ThemeContext';
+import { horizontalScale, verticalScale, moderateScale, fontScale } from '../../utils/responsive';
+import { useAuth } from '../../contexts/AuthContext';
+import Shimmer from '../components/Shimmer';
 
 interface Notification {
   id: string;
@@ -31,59 +34,57 @@ interface NotificationsModalProps {
   onNotificationPress: (notification: Notification) => void;
 }
 
-export default function NotificationsModal({
-  visible,
-  onClose,
-  notifications,
-  loading,
-  onLoadMore,
-  onNotificationPress,
-}: NotificationsModalProps) {
-  const [localNotifications, setLocalNotifications] = useState<Notification[]>([]);
+export default function NotificationsModal({ visible, onClose, notifications, loading, onLoadMore, onNotificationPress }: NotificationsModalProps) {
+  const { accessToken } = useAuth();
+  const { theme, isDarkMode } = useTheme();
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
-
-  useEffect(() => {
-    setLocalNotifications(notifications);
-  }, [notifications]);
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
 
   const handleNotificationPress = (notification: Notification) => {
     setSelectedNotification(notification);
     onNotificationPress(notification);
+    // Animate in
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+    ]).start();
   };
 
-  const renderNotification = ({ item }: { item: Notification }) => (
-    <TouchableOpacity
-      style={[styles.notificationItem, item.status === 'unread' && styles.unreadItem]}
-      onPress={() => handleNotificationPress(item)}
-    >
-      <View style={styles.notificationContent}>
-        <Text style={styles.notificationTitle} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.notificationDescription} numberOfLines={2}>{item.description}</Text>
-        <Text style={styles.notificationTime}>{formatDate(item.created_at)}</Text>
-      </View>
-      {item.status === 'unread' && <View style={styles.unreadDot} />}
-    </TouchableOpacity>
-  );
-
-  const renderFooter = () => {
-    if (!loading) return null;
-    return (
-      <View style={styles.loaderContainer}>
-        <ActivityIndicator color={theme.COLORS.primary.main} />
-      </View>
-    );
+  const handleCloseDetail = () => {
+    // Animate out
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setSelectedNotification(null);
+    });
   };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleString();
+  };
+
+  const translateY = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [50, 0],
+  });
 
   return (
     <Modal
@@ -92,64 +93,148 @@ export default function NotificationsModal({
       transparent={true}
       onRequestClose={onClose}
     >
-      <View style={styles.modalContainer}>
-        <View style={styles.modalContent}>
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Notifications</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color={theme.COLORS.text.primary} />
-            </TouchableOpacity>
-          </View>
-
-          <FlatList
-            data={localNotifications}
-            renderItem={renderNotification}
-            keyExtractor={(item) => item.id}
-            onEndReached={onLoadMore}
-            onEndReachedThreshold={0.5}
-            ListFooterComponent={renderFooter}
-            contentContainerStyle={styles.listContent}
-            removeClippedSubviews={true}
-            maxToRenderPerBatch={10}
-            windowSize={10}
-            initialNumToRender={10}
-          />
+      <SafeAreaView style={[styles.modalContainer, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.9)' : '#F5F5F5' }]}>
+        <View style={[styles.modalHeader, { 
+          backgroundColor: isDarkMode ? 'rgba(0,0,0,0.8)' : 'white',
+          borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
+        }]}>
+          <Text style={[styles.modalTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>Notifications</Text>
+          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <Ionicons name="close" size={24} color={isDarkMode ? 'white' : theme.COLORS.text.primary} />
+          </TouchableOpacity>
         </View>
 
-        {/* Detailed Notification Modal */}
+        <ScrollView style={styles.notificationsList}>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              {[1, 2, 3].map((index) => (
+                <View key={index} style={[styles.notificationItem, { 
+                  backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'white',
+                  borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: isDarkMode ? 0 : 0.1,
+                  shadowRadius: 2,
+                  elevation: isDarkMode ? 0 : 2,
+                  marginBottom: verticalScale(8)
+                }]}>
+                  <Shimmer width={40} height={40} borderRadius={20} />
+                  <View style={styles.notificationContent}>
+                    <Shimmer width={200} height={16} />
+                    <Shimmer width={150} height={14} style={{ marginTop: verticalScale(4) }} />
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : notifications.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="notifications-off-outline" size={48} color={isDarkMode ? 'rgba(255,255,255,0.5)' : theme.COLORS.text.secondary} />
+              <Text style={[styles.emptyText, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>No notifications</Text>
+            </View>
+          ) : (
+            notifications.map((notification) => (
+              <TouchableOpacity
+                key={notification.id}
+                style={[
+                  styles.notificationItem,
+                  { 
+                    backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'white',
+                    borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: isDarkMode ? 0 : 0.1,
+                    shadowRadius: 2,
+                    elevation: isDarkMode ? 0 : 2,
+                    marginBottom: verticalScale(8)
+                  }
+                ]}
+                onPress={() => handleNotificationPress(notification)}
+              >
+                <View style={[styles.iconContainer, { 
+                  backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.1)' : `${theme.COLORS.primary.main}10`,
+                  borderWidth: isDarkMode ? 0 : 1,
+                  borderColor: `${theme.COLORS.primary.main}20`
+                }]}>
+                  <Ionicons name="notifications-outline" size={24} color={theme.COLORS.primary.main} />
+                </View>
+                <View style={styles.notificationContent}>
+                  <Text style={[styles.notificationTitle, { 
+                    color: isDarkMode ? 'white' : theme.COLORS.text.primary,
+                    fontWeight: notification.status === 'unread' ? '600' : '500'
+                  }]}>
+                    {notification.title}
+                  </Text>
+                  <Text style={[styles.notificationDescription, { 
+                    color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary,
+                    opacity: notification.status === 'unread' ? 1 : 0.8
+                  }]}>
+                    {notification.description}
+                  </Text>
+                  <Text style={[styles.notificationTime, { 
+                    color: isDarkMode ? 'rgba(255,255,255,0.5)' : theme.COLORS.text.secondary
+                  }]}>
+                    {formatDate(notification.created_at)}
+                  </Text>
+                </View>
+                {notification.status === 'unread' && (
+                  <View style={[styles.unreadDot, { 
+                    backgroundColor: theme.COLORS.primary.main,
+                    elevation: isDarkMode ? 0 : 2
+                  }]} />
+                )}
+              </TouchableOpacity>
+            ))
+          )}
+        </ScrollView>
+
+        {/* Notification Detail Modal */}
         <Modal
           visible={!!selectedNotification}
           transparent={true}
-          animationType="fade"
-          onRequestClose={() => setSelectedNotification(null)}
+          animationType="none"
+          onRequestClose={handleCloseDetail}
         >
-          <View style={styles.detailModalContainer}>
-            <View style={styles.detailModalContent}>
-              <View style={styles.detailHeader}>
-                <Text style={styles.detailHeaderTitle}>Notification Details</Text>
-                <TouchableOpacity 
-                  onPress={() => setSelectedNotification(null)}
-                  style={styles.detailCloseButton}
-                >
-                  <Ionicons name="close" size={24} color={theme.COLORS.text.primary} />
+          <Animated.View 
+            style={[
+              styles.detailModalOverlay,
+              { 
+                backgroundColor: isDarkMode ? 'rgba(0,0,0,0.95)' : 'rgba(255,255,255,0.95)',
+                opacity: fadeAnim,
+              }
+            ]}
+          >
+            <Animated.View 
+              style={[
+                styles.detailModalContent,
+                { 
+                  backgroundColor: isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.9)',
+                  transform: [{ translateY }],
+                }
+              ]}
+            >
+              <View style={styles.detailModalHeader}>
+                <View style={[styles.detailIconContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.2)' : `${theme.COLORS.primary.main}20` }]}>
+                  <Ionicons name="notifications-outline" size={24} color={theme.COLORS.primary.main} />
+                </View>
+                <Text style={[styles.detailModalTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
+                  {selectedNotification?.title}
+                </Text>
+                <TouchableOpacity onPress={handleCloseDetail} style={styles.closeButton}>
+                  <Ionicons name="close" size={24} color={isDarkMode ? 'white' : theme.COLORS.text.primary} />
                 </TouchableOpacity>
               </View>
-              
-              {selectedNotification && (
-                <View style={styles.detailContent}>
-                  <Text style={styles.detailTitle}>{selectedNotification.title}</Text>
-                  <Text style={styles.detailTime}>
-                    {formatDate(selectedNotification.created_at)}
-                  </Text>
-                  <Text style={styles.detailDescription}>
-                    {selectedNotification.description}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
+              <Text style={[styles.detailModalTime, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
+                {selectedNotification && formatDate(selectedNotification.created_at)}
+              </Text>
+              <ScrollView style={styles.detailModalBody}>
+                <Text style={[styles.detailModalDescription, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
+                  {selectedNotification?.description}
+                </Text>
+              </ScrollView>
+            </Animated.View>
+          </Animated.View>
         </Modal>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
@@ -157,125 +242,122 @@ export default function NotificationsModal({
 const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
   },
-  modalContent: {
-    backgroundColor: theme.COLORS.background.default,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    height: '80%',
-  },
-  header: {
+  modalHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     padding: moderateScale(16),
     borderBottomWidth: 1,
-    borderBottomColor: theme.COLORS.border.main,
   },
-  headerTitle: {
+  modalTitle: {
     fontSize: fontScale(20),
-    color: theme.COLORS.text.primary,
-    ...theme.FONTS.bold,
+    fontWeight: '700',
   },
   closeButton: {
     padding: moderateScale(4),
   },
-  listContent: {
+  notificationsList: {
+    flex: 1,
+  },
+  loadingContainer: {
     padding: moderateScale(16),
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: moderateScale(24),
+  },
+  emptyText: {
+    fontSize: fontScale(16),
+    marginTop: verticalScale(16),
   },
   notificationItem: {
     flexDirection: 'row',
-    padding: moderateScale(12),
-    borderRadius: 8,
-    marginBottom: verticalScale(8),
-    backgroundColor: theme.COLORS.background.paper,
-    alignItems: 'center',
+    padding: moderateScale(16),
+    borderRadius: 12,
+    marginHorizontal: horizontalScale(16),
+    borderBottomWidth: 1,
   },
-  unreadItem: {
-    backgroundColor: `${theme.COLORS.primary.main}15`,
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: horizontalScale(12),
   },
   notificationContent: {
     flex: 1,
+    marginRight: horizontalScale(8),
   },
   notificationTitle: {
     fontSize: fontScale(16),
-    color: theme.COLORS.text.primary,
-    ...theme.FONTS.medium,
     marginBottom: verticalScale(4),
   },
   notificationDescription: {
     fontSize: fontScale(14),
-    color: theme.COLORS.text.secondary,
     marginBottom: verticalScale(4),
+    lineHeight: verticalScale(20),
   },
   notificationTime: {
     fontSize: fontScale(12),
-    color: theme.COLORS.text.secondary,
   },
   unreadDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: theme.COLORS.primary.main,
     marginLeft: horizontalScale(8),
+    alignSelf: 'center',
   },
-  loaderContainer: {
-    paddingVertical: verticalScale(16),
-    alignItems: 'center',
-  },
-  detailModalContainer: {
+  detailModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: moderateScale(16),
   },
   detailModalContent: {
-    backgroundColor: theme.COLORS.background.default,
-    borderRadius: 12,
     width: '90%',
     maxHeight: '80%',
-    elevation: 5,
+    borderRadius: 16,
+    padding: moderateScale(24),
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
+    elevation: 5,
   },
-  detailHeader: {
+  detailModalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: moderateScale(16),
-    borderBottomWidth: 1,
-    borderBottomColor: theme.COLORS.border.main,
-  },
-  detailHeaderTitle: {
-    fontSize: fontScale(18),
-    color: theme.COLORS.text.primary,
-    ...theme.FONTS.bold,
-  },
-  detailCloseButton: {
-    padding: moderateScale(4),
-  },
-  detailContent: {
-    padding: moderateScale(16),
-  },
-  detailTitle: {
-    fontSize: fontScale(20),
-    color: theme.COLORS.text.primary,
-    ...theme.FONTS.bold,
-    marginBottom: verticalScale(8),
-  },
-  detailTime: {
-    fontSize: fontScale(14),
-    color: theme.COLORS.text.secondary,
     marginBottom: verticalScale(16),
   },
-  detailDescription: {
+  detailIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: horizontalScale(16),
+  },
+  detailModalTitle: {
+    fontSize: fontScale(24),
+    fontWeight: '700',
+    flex: 1,
+    marginRight: horizontalScale(16),
+  },
+  detailModalTime: {
+    fontSize: fontScale(14),
+    marginBottom: verticalScale(24),
+  },
+  detailModalBody: {
+    flex: 1,
+  },
+  detailModalDescription: {
     fontSize: fontScale(16),
-    color: theme.COLORS.text.primary,
-    lineHeight: 24,
+    lineHeight: verticalScale(24),
   },
 }); 

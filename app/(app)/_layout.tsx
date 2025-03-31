@@ -1,16 +1,22 @@
 import React from 'react';
 import { Tabs, Redirect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import theme from '../../constants/theme';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { View, ActivityIndicator } from 'react-native';
 
 export default function AppLayout() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { theme, isLoading: isThemeLoading } = useTheme();
 
-  if (isLoading) {
+  if (isAuthLoading || isThemeLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ 
+        flex: 1, 
+        justifyContent: 'center', 
+        alignItems: 'center',
+        backgroundColor: theme.COLORS.background.default 
+      }}>
         <ActivityIndicator size="large" color={theme.COLORS.primary.main} />
       </View>
     );

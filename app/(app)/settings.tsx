@@ -8,10 +8,12 @@ import {
   Switch,
   SafeAreaView,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
-import theme, { lightTheme, darkTheme } from '../../constants/theme';
 import { horizontalScale, verticalScale, moderateScale, fontScale } from '../../utils/responsive';
+import { NotificationService } from '../../services/NotificationService';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface SettingItem {
   icon: string;
@@ -24,8 +26,7 @@ interface SettingItem {
 }
 
 export default function SettingsScreen() {
-  const { isDarkMode, toggleTheme } = useTheme();
-  const theme = isDarkMode ? darkTheme : lightTheme;
+  const { isDarkMode, toggleTheme, theme } = useTheme();
   const [settings, setSettings] = useState<SettingItem[]>([
     {
       icon: 'moon-outline',
@@ -80,6 +81,9 @@ export default function SettingsScreen() {
     },
   ]);
 
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const { accessToken } = useAuth();
+
   const handleToggle = (index: number, value: boolean) => {
     const newSettings = [...settings];
     newSettings[index] = { ...newSettings[index], value };
@@ -89,58 +93,84 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleNotificationToggle = async () => {
+    if (!accessToken) return;
+
+    const notificationService = NotificationService.getInstance();
+    
+    if (!notificationsEnabled) {
+      await notificationService.registerForPushNotifications(accessToken);
+      setNotificationsEnabled(true);
+    } else {
+      await notificationService.unregisterDevice(accessToken);
+      setNotificationsEnabled(false);
+    }
+  };
+
+  const gradientColors = isDarkMode 
+    ? ['#1C8D3A', '#165C27', '#0A3814']
+    : ['#E8F5E9', '#C8E6C9', '#A5D6A7'];
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.COLORS.background.default }]}>
-      <ScrollView style={styles.scrollView}>
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.COLORS.text.primary }]}>App Settings</Text>
-          <Text style={[styles.sectionSubtitle, { color: theme.COLORS.text.secondary }]}>Customize your app experience</Text>
-        </View>
+      <LinearGradient
+        colors={gradientColors}
+        style={styles.gradientBackground}
+      >
+        <ScrollView style={styles.scrollView}>
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>App Settings</Text>
+            <Text style={[styles.sectionSubtitle, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>Customize your app experience</Text>
+          </View>
 
-        <View style={styles.menuContainer}>
-          {settings.map((item, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[styles.menuItem, { backgroundColor: theme.COLORS.background.paper }]}
-              onPress={() => item.type !== 'toggle' && item.onPress?.()}
-            >
-              <View style={styles.menuItemLeft}>
-                <View style={[styles.iconContainer, { backgroundColor: `${theme.COLORS.primary.main}20` }]}>
-                  <Ionicons name={item.icon as any} size={24} color={theme.COLORS.primary.main} />
+          <View style={styles.menuContainer}>
+            {settings.map((item, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[styles.menuItem, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.9)' }]}
+                onPress={() => item.type !== 'toggle' && item.onPress?.()}
+              >
+                <View style={styles.menuItemLeft}>
+                  <View style={[styles.iconContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.1)' : `${theme.COLORS.primary.main}20` }]}>
+                    <Ionicons name={item.icon as any} size={24} color={theme.COLORS.primary.main} />
+                  </View>
+                  <View style={styles.menuItemText}>
+                    <Text style={[styles.menuItemTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>{item.title}</Text>
+                    {item.subtitle && (
+                      <Text style={[styles.menuItemSubtitle, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>{item.subtitle}</Text>
+                    )}
+                  </View>
                 </View>
-                <View style={styles.menuItemText}>
-                  <Text style={[styles.menuItemTitle, { color: theme.COLORS.text.primary }]}>{item.title}</Text>
-                  {item.subtitle && (
-                    <Text style={[styles.menuItemSubtitle, { color: theme.COLORS.text.secondary }]}>{item.subtitle}</Text>
-                  )}
-                </View>
-              </View>
-              {item.type === 'toggle' && (
-                <Switch
-                  value={item.value}
-                  onValueChange={(value) => handleToggle(index, value)}
-                  trackColor={{ false: theme.COLORS.text.secondary, true: theme.COLORS.primary.main }}
-                  thumbColor={theme.COLORS.background.paper}
-                />
-              )}
-              {item.type !== 'toggle' && (
-                <Ionicons name="chevron-forward" size={24} color={theme.COLORS.text.secondary} />
-              )}
-            </TouchableOpacity>
-          ))}
-        </View>
+                {item.type === 'toggle' && (
+                  <Switch
+                    value={item.value}
+                    onValueChange={(value) => handleToggle(index, value)}
+                    trackColor={{ false: isDarkMode ? 'rgba(255,255,255,0.2)' : theme.COLORS.text.secondary, true: theme.COLORS.primary.main }}
+                    thumbColor={isDarkMode ? 'white' : theme.COLORS.background.paper}
+                  />
+                )}
+                {item.type !== 'toggle' && (
+                  <Ionicons name="chevron-forward" size={24} color={isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
 
-        <View style={styles.versionContainer}>
-          <Text style={[styles.versionText, { color: theme.COLORS.text.secondary }]}>Version 1.0.0</Text>
-          <Text style={[styles.copyrightText, { color: theme.COLORS.text.secondary }]}>© 2024 Your Company. All rights reserved.</Text>
-        </View>
-      </ScrollView>
+          <View style={styles.versionContainer}>
+            <Text style={[styles.versionText, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>Version 1.0.0</Text>
+            <Text style={[styles.copyrightText, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>© 2024 Your Company. All rights reserved.</Text>
+          </View>
+        </ScrollView>
+      </LinearGradient>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  gradientBackground: {
     flex: 1,
   },
   scrollView: {

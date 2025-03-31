@@ -4,11 +4,13 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  TouchableOpacity,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
 import { horizontalScale, verticalScale, moderateScale, fontScale } from '../../utils/responsive';
 import { useAuth } from '../../contexts/AuthContext';
 import { API_URL } from '../../constants/api';
@@ -37,6 +39,7 @@ interface EmployeeProfile {
     total_messages: number;
     chat_mode: string;
     is_escalated: boolean;
+    created_at: string;
   };
   upcoming_meets: number;
   upcoming_sessions: number;
@@ -54,10 +57,15 @@ interface EmployeeProfile {
       Leave_Start_Date: string;
       Leave_End_Date: string;
     }>;
+    performance: Array<{
+      Review_Period: string;
+      Performance_Rating: number;
+      Manager_Feedback: string;
+      Promotion_Consideration: boolean;
+    }>;
     vibemeter: Array<{
       Response_Date: string;
       Vibe_Score: number;
-      Emotion_Zone: string;
     }>;
   };
 }
@@ -98,26 +106,24 @@ export const StatisticsShimmer = () => (
 
 export default function StatisticsScreen() {
   const { accessToken } = useAuth();
+  const { theme, isDarkMode } = useTheme();
   const [profile, setProfile] = useState<EmployeeProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `${API_URL}/employee/profile`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-          },
-        }
-      );
+      const response = await fetch(`${API_URL}/employee/profile`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
       
       if (!response.ok) {
         throw new Error('Failed to fetch profile');
       }
 
-      const data: EmployeeProfile = await response.json();
+      const data = await response.json();
       setProfile(data);
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -130,110 +136,109 @@ export default function StatisticsScreen() {
     fetchProfile();
   }, []);
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <ScrollView style={styles.scrollView}>
-          <StatisticsShimmer />
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
+  const gradientColors = isDarkMode 
+    ? ['#1C8D3A', '#165C27', '#0A3814']
+    : ['#E8F5E9', '#C8E6C9', '#A5D6A7'];
 
-  if (!profile) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Failed to load profile data</Text>
+  const renderStatCard = (title: string, value: string | number, icon: string, subtitle?: string) => (
+    <View style={[styles.statCard, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(255, 255, 255, 0.8)' }]}>
+      <View style={[styles.iconContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.1)' : `${theme.COLORS.primary.main}20` }]}>
+        <Ionicons name={icon as any} size={24} color={theme.COLORS.primary.main} />
       </View>
-    );
-  }
+      <Text style={[styles.statTitle, { color: isDarkMode ? 'rgba(255, 255, 255, 0.7)' : theme.COLORS.text.secondary }]}>{title}</Text>
+      <Text style={[styles.statValue, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>{value}</Text>
+      {subtitle && (
+        <Text style={[styles.statSubtitle, { color: isDarkMode ? 'rgba(255, 255, 255, 0.5)' : theme.COLORS.text.secondary }]}>
+          {subtitle}
+        </Text>
+      )}
+    </View>
+  );
+
+  const renderShimmerCard = () => (
+    <View style={[styles.statCard, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(255, 255, 255, 0.8)' }]}>
+      <View style={styles.iconContainer}>
+        <Shimmer width={24} height={24} borderRadius={12} />
+      </View>
+      <Shimmer width={100} height={16} style={{ marginTop: verticalScale(8) }} />
+      <Shimmer width={60} height={24} style={{ marginTop: verticalScale(4) }} />
+      <Shimmer width={80} height={14} style={{ marginTop: verticalScale(4) }} />
+    </View>
+  );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
-        {/* Mood Statistics */}
-        <LinearGradient
-          colors={['rgba(134, 188, 37, 0.1)', 'rgba(134, 188, 37, 0.05)']}
-          style={styles.section}
-        >
-          <View style={styles.sectionHeader}>
-            <Ionicons name="stats-chart-outline" size={24} color={theme.COLORS.text.primary} />
-            <Text style={styles.sectionTitle}>Mood Statistics</Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.COLORS.background.default }]}>
+      <LinearGradient
+        colors={gradientColors}
+        style={styles.gradientBackground}
+      >
+        <ScrollView style={styles.scrollView}>
+          <View style={styles.header}>
+            <Text style={[styles.headerTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>Statistics</Text>
+            <Text style={[styles.headerSubtitle, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
+              Your performance metrics
+            </Text>
           </View>
-          <View style={styles.moodStats}>
-            <View style={styles.statRow}>
-              <Text style={styles.label}>Average Score</Text>
-              <Text style={styles.value}>{profile.mood_stats.average_score}</Text>
-            </View>
-            <View style={styles.statRow}>
-              <Text style={styles.label}>Total Sessions</Text>
-              <Text style={styles.value}>{profile.mood_stats.total_sessions}</Text>
-            </View>
-            <View style={styles.emotionDistribution}>
-              <Text style={styles.subheader}>Emotion Distribution</Text>
-              {Object.entries(profile.mood_stats?.emotion_distribution || {}).map(([emotion, count]) => (
-                <View key={emotion} style={styles.emotionRow}>
-                  <Text style={styles.emotionLabel}>{emotion}</Text>
-                  <Text style={styles.emotionValue}>{count}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        </LinearGradient>
 
-        {/* Leave Information */}
-        <LinearGradient
-          colors={['rgba(134, 188, 37, 0.1)', 'rgba(134, 188, 37, 0.05)']}
-          style={styles.section}
-        >
-          <View style={styles.sectionHeader}>
-            <Ionicons name="calendar-outline" size={24} color={theme.COLORS.text.primary} />
-            <Text style={styles.sectionTitle}>Leave Information</Text>
+          <View style={styles.statsGrid}>
+            {loading ? (
+              <>
+                {renderShimmerCard()}
+                {renderShimmerCard()}
+                {renderShimmerCard()}
+                {renderShimmerCard()}
+              </>
+            ) : profile ? (
+              <>
+                {renderStatCard(
+                  'Mood Score',
+                  profile.mood_stats.average_score.toFixed(1),
+                  'happy-outline',
+                  `${profile.mood_stats.total_sessions} sessions`
+                )}
+                {renderStatCard(
+                  'Performance',
+                  `${profile.company_data.performance[0]?.Performance_Rating || 0}/5`,
+                  'trophy-outline',
+                  profile.company_data.performance[0]?.Manager_Feedback
+                )}
+                {renderStatCard(
+                  'Work Hours',
+                  `${profile.company_data.activity[0]?.Work_Hours || 0}h`,
+                  'time-outline',
+                  `${profile.company_data.activity[0]?.Meetings_Attended || 0} meetings`
+                )}
+                {renderStatCard(
+                  'Vibe Score',
+                  `${profile.company_data.vibemeter[0]?.Vibe_Score || 0}/5`,
+                  'trending-up-outline',
+                  'Last 30 days'
+                )}
+              </>
+            ) : null}
           </View>
-          {profile.company_data.leave.length > 0 ? (
-            <View style={styles.leaveInfo}>
-              {profile.company_data.leave.map((leave, index) => (
-                <View key={index} style={styles.leaveRow}>
-                  <Text style={styles.leaveType}>{leave.Leave_Type}</Text>
-                  <Text style={styles.leaveDays}>{leave.Leave_Days} days</Text>
-                  <Text style={styles.leaveDates}>
-                    {new Date(leave.Leave_Start_Date).toLocaleDateString()} - 
-                    {new Date(leave.Leave_End_Date).toLocaleDateString()}
+
+          <View style={[styles.section, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.9)' }]}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="calendar-outline" size={24} color={isDarkMode ? 'white' : theme.COLORS.primary.main} />
+              <Text style={[styles.sectionTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>Leave History</Text>
+            </View>
+            {profile?.company_data.leave.map((leave, index) => (
+              <View key={index} style={[styles.leaveItem, { backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.8)' }]}>
+                <View style={styles.leaveHeader}>
+                  <Text style={[styles.leaveType, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>{leave.Leave_Type}</Text>
+                  <Text style={[styles.leaveDays, { color: isDarkMode ? 'rgba(255, 255, 255, 0.7)' : theme.COLORS.text.secondary }]}>
+                    {leave.Leave_Days} days
                   </Text>
                 </View>
-              ))}
-            </View>
-          ) : (
-            <Text style={styles.noDataText}>No leave records found</Text>
-          )}
-        </LinearGradient>
-
-        {/* Performance & Vibe */}
-        <LinearGradient
-          colors={['rgba(134, 188, 37, 0.1)', 'rgba(134, 188, 37, 0.05)']}
-          style={styles.section}
-        >
-          <View style={styles.sectionHeader}>
-            <Ionicons name="trending-up-outline" size={24} color={theme.COLORS.text.primary} />
-            <Text style={styles.sectionTitle}>Performance & Vibe</Text>
+                <Text style={[styles.leaveDate, { color: isDarkMode ? 'rgba(255, 255, 255, 0.5)' : theme.COLORS.text.secondary }]}>
+                  {new Date(leave.Leave_Start_Date).toLocaleDateString()} - {new Date(leave.Leave_End_Date).toLocaleDateString()}
+                </Text>
+              </View>
+            ))}
           </View>
-          {profile.company_data.vibemeter.length > 0 ? (
-            <View style={styles.vibeInfo}>
-              {profile.company_data.vibemeter.map((vibe, index) => (
-                <View key={index} style={styles.vibeRow}>
-                  <Text style={styles.vibeDate}>
-                    {new Date(vibe.Response_Date).toLocaleDateString()}
-                  </Text>
-                  <Text style={styles.vibeScore}>Score: {vibe.Vibe_Score}</Text>
-                  <Text style={styles.vibeZone}>{vibe.Emotion_Zone}</Text>
-                </View>
-              ))}
-            </View>
-          ) : (
-            <Text style={styles.noDataText}>No vibe data available</Text>
-          )}
-        </LinearGradient>
-      </ScrollView>
+        </ScrollView>
+      </LinearGradient>
     </SafeAreaView>
   );
 }
@@ -241,31 +246,63 @@ export default function StatisticsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.COLORS.background.default,
+  },
+  gradientBackground: {
+    flex: 1,
   },
   scrollView: {
     flex: 1,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  header: {
+    padding: horizontalScale(16),
+    paddingTop: verticalScale(24),
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  headerTitle: {
+    fontSize: fontScale(28),
+    fontWeight: '700',
+    marginBottom: verticalScale(8),
   },
-  errorText: {
-    color: theme.COLORS.error,
+  headerSubtitle: {
     fontSize: fontScale(16),
   },
-  section: {
-    marginBottom: verticalScale(16),
-    borderRadius: 12,
-    marginHorizontal: horizontalScale(16),
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
     padding: horizontalScale(16),
-    overflow: 'hidden',
+    marginTop: verticalScale(16),
+  },
+  statCard: {
+    width: '48%',
+    padding: moderateScale(16),
+    borderRadius: 12,
+    marginBottom: verticalScale(16),
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: verticalScale(8),
+  },
+  statTitle: {
+    fontSize: fontScale(14),
+    marginBottom: verticalScale(4),
+  },
+  statValue: {
+    fontSize: fontScale(24),
+    fontWeight: '700',
+    marginBottom: verticalScale(4),
+  },
+  statSubtitle: {
+    fontSize: fontScale(12),
+  },
+  section: {
+    padding: horizontalScale(16),
+    marginHorizontal: horizontalScale(16),
+    marginTop: verticalScale(16),
+    borderRadius: 12,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -273,111 +310,30 @@ const styles = StyleSheet.create({
     marginBottom: verticalScale(16),
   },
   sectionTitle: {
-    color: theme.COLORS.text.primary,
     fontSize: fontScale(20),
-    ...theme.FONTS.bold,
+    fontWeight: '700',
     marginLeft: horizontalScale(8),
   },
-  profileInfo: {
-    gap: verticalScale(12),
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  label: {
-    color: theme.COLORS.text.secondary,
-    fontSize: fontScale(14),
-  },
-  value: {
-    color: theme.COLORS.text.primary,
-    fontSize: fontScale(14),
-    ...theme.FONTS.medium,
-  },
-  moodStats: {
-    gap: verticalScale(16),
-  },
-  statRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  emotionDistribution: {
-    gap: verticalScale(8),
-  },
-  subheader: {
-    color: theme.COLORS.text.primary,
-    fontSize: fontScale(16),
-    ...theme.FONTS.medium,
+  leaveItem: {
+    padding: moderateScale(16),
+    borderRadius: 8,
     marginBottom: verticalScale(8),
   },
-  emotionRow: {
+  leaveHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: verticalScale(4),
-  },
-  emotionLabel: {
-    color: theme.COLORS.text.secondary,
-    fontSize: fontScale(14),
-  },
-  emotionValue: {
-    color: theme.COLORS.text.primary,
-    fontSize: fontScale(14),
-    ...theme.FONTS.medium,
-  },
-  leaveInfo: {
-    gap: verticalScale(12),
-  },
-  leaveRow: {
-    backgroundColor: 'rgba(134, 188, 37, 0.05)',
-    padding: moderateScale(12),
-    borderRadius: 8,
-    gap: verticalScale(4),
+    marginBottom: verticalScale(4),
   },
   leaveType: {
-    color: theme.COLORS.text.primary,
     fontSize: fontScale(16),
-    ...theme.FONTS.medium,
+    fontWeight: '500',
   },
   leaveDays: {
-    color: theme.COLORS.primary.main,
     fontSize: fontScale(14),
-    ...theme.FONTS.medium,
   },
-  leaveDates: {
-    color: theme.COLORS.text.secondary,
+  leaveDate: {
     fontSize: fontScale(12),
-  },
-  vibeInfo: {
-    gap: verticalScale(12),
-  },
-  vibeRow: {
-    backgroundColor: 'rgba(134, 188, 37, 0.05)',
-    padding: moderateScale(12),
-    borderRadius: 8,
-    gap: verticalScale(4),
-  },
-  vibeDate: {
-    color: theme.COLORS.text.secondary,
-    fontSize: fontScale(12),
-  },
-  vibeScore: {
-    color: theme.COLORS.text.primary,
-    fontSize: fontScale(14),
-    ...theme.FONTS.medium,
-  },
-  vibeZone: {
-    color: theme.COLORS.primary.main,
-    fontSize: fontScale(14),
-    ...theme.FONTS.medium,
-  },
-  noDataText: {
-    color: theme.COLORS.text.secondary,
-    fontSize: fontScale(14),
-    textAlign: 'center',
-    padding: moderateScale(16),
   },
   statisticsContainer: {
     padding: moderateScale(16),
@@ -387,19 +343,6 @@ const styles = StyleSheet.create({
   },
   statisticsHeader: {
     marginBottom: verticalScale(16),
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: verticalScale(24),
-  },
-  statCard: {
-    width: '48%',
-    padding: moderateScale(12),
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: 8,
-    marginBottom: verticalScale(12),
   },
   chartsContainer: {
     width: '100%',

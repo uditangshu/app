@@ -23,6 +23,7 @@ import ChatScreen from '../modals/chat';
 import { API_URL } from '../../constants/api';
 import NotificationsModal from '../modals/notifications';
 import Shimmer from '../components/Shimmer';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface EventItem {
   id: string;
@@ -115,6 +116,7 @@ const events: EventItem[] = [
 export default function HomeScreen() {
   const { user } = useAuth();
   const { accessToken } = useAuth();
+  const { theme, isDarkMode } = useTheme();
   const [chats, setChats] = useState<ChatItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -375,7 +377,7 @@ export default function HomeScreen() {
   const unreadCount = notifications.filter(n => n.status === 'unread').length;
 
   const renderChatItemShimmer = () => (
-    <View style={styles.chatItem}>
+    <View style={[styles.chatItem, { backgroundColor: theme.COLORS.background.paper }]}>
       <View style={styles.chatIconContainer}>
         <Shimmer width={40} height={40} borderRadius={20} />
       </View>
@@ -393,17 +395,32 @@ export default function HomeScreen() {
     </View>
   );
 
+  const gradientColors = isDarkMode 
+    ? ['#1C8D3A', '#165C27', '#0A3814']
+    : ['#E8F5E9', '#C8E6C9', '#A5D6A7'];
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.COLORS.background.default }]}>
       <LinearGradient
-        colors={['#1C8D3A', '#165C27', '#0A3814']}
+        colors={gradientColors}
         style={styles.gradientBackground}
       >
-        <ScrollView style={styles.scrollView}>
+        <ScrollView 
+          style={styles.scrollView}
+          onScroll={({ nativeEvent }) => {
+            const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+            const paddingToBottom = 20;
+            const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
+            if (isCloseToBottom) {
+              loadMore();
+            }
+          }}
+          scrollEventThrottle={400}
+        >
           <View style={styles.header}>
             <View>
-              <Text style={styles.welcomeText}>Welcome, {user?.employee_id}</Text>
-              <Text style={styles.subtitleText}>Your employee dashboard</Text>
+              <Text style={[styles.welcomeText, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>Welcome, {user?.employee_id}</Text>
+              <Text style={[styles.subtitleText, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>Your employee dashboard</Text>
             </View>
             <View style={styles.headerRight}>
               <TouchableOpacity
@@ -413,11 +430,11 @@ export default function HomeScreen() {
                 <Ionicons
                   name="notifications-outline"
                   size={24}
-                  color={theme.COLORS.text.primary}
+                  color={isDarkMode ? 'white' : theme.COLORS.text.primary}
                 />
                 {unreadCount > 0 && (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>
+                  <View style={[styles.badge, { backgroundColor: theme.COLORS.error }]}>
+                    <Text style={[styles.badgeText, { color: theme.COLORS.background.paper }]}>
                       {unreadCount > 99 ? '99+' : unreadCount}
                     </Text>
                   </View>
@@ -427,12 +444,12 @@ export default function HomeScreen() {
           </View>
 
           {/* Updates Section */}
-          <View style={styles.section}>
+          <View style={[styles.section, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.9)' }]}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="stats-chart" size={24} color="white" />
-              <Text style={styles.sectionTitle}>Your Updates</Text>
+              <Ionicons name="stats-chart" size={24} color={isDarkMode ? 'white' : theme.COLORS.primary.main} />
+              <Text style={[styles.sectionTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>Your Updates</Text>
             </View>
-            <Text style={styles.sectionSubtitle}>Recent activity and performance</Text>
+            <Text style={[styles.sectionSubtitle, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>Recent activity and performance</Text>
 
             <View style={styles.updateGrid}>
               {isProfileLoading ? (
@@ -501,50 +518,50 @@ export default function HomeScreen() {
               ) : profile ? (
                 <>
                   {/* Mood Score */}
-                  <View style={styles.updateCard}>
-                    <View style={styles.updateIconContainer}>
+                  <View style={[styles.updateCard, { backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.8)' }]}>
+                    <View style={[styles.updateIconContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.1)' : `${theme.COLORS.primary.main}20` }]}>
                       <Ionicons name="happy-outline" size={24} color={theme.COLORS.primary.main} />
                     </View>
-                    <Text style={styles.updateLabel}>Mood Score</Text>
-                    <Text style={styles.updateValue}>
+                    <Text style={[styles.updateLabel, { color: isDarkMode ? 'rgba(255, 255, 255, 0.7)' : theme.COLORS.text.secondary }]}>Mood Score</Text>
+                    <Text style={[styles.updateValue, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
                       {profile.mood_stats.average_score.toFixed(1)}/5
                     </Text>
-                    <Text style={styles.updateSubtext}>
+                    <Text style={[styles.updateSubtext, { color: isDarkMode ? 'rgba(255, 255, 255, 0.5)' : theme.COLORS.text.secondary }]}>
                       {profile.mood_stats.total_sessions} sessions
                     </Text>
                   </View>
 
                   {/* Upcoming Meetings */}
-                  <View style={styles.updateCard}>
-                    <View style={styles.updateIconContainer}>
+                  <View style={[styles.updateCard, { backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.8)' }]}>
+                    <View style={[styles.updateIconContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.1)' : `${theme.COLORS.primary.main}20` }]}>
                       <Ionicons name="calendar" size={24} color={theme.COLORS.primary.main} />
                     </View>
-                    <Text style={styles.updateLabel}>Upcoming</Text>
-                    <Text style={styles.updateValue}>{profile.upcoming_meets}</Text>
-                    <Text style={styles.updateSubtext}>meetings</Text>
+                    <Text style={[styles.updateLabel, { color: isDarkMode ? 'rgba(255, 255, 255, 0.7)' : theme.COLORS.text.secondary }]}>Upcoming</Text>
+                    <Text style={[styles.updateValue, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>{profile.upcoming_meets}</Text>
+                    <Text style={[styles.updateSubtext, { color: isDarkMode ? 'rgba(255, 255, 255, 0.5)' : theme.COLORS.text.secondary }]}>meetings</Text>
                   </View>
 
                   {/* Upcoming Sessions */}
-                  <View style={styles.updateCard}>
-                    <View style={styles.updateIconContainer}>
+                  <View style={[styles.updateCard, { backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.8)' }]}>
+                    <View style={[styles.updateIconContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.1)' : `${theme.COLORS.primary.main}20` }]}>
                       <Ionicons name="people" size={24} color={theme.COLORS.primary.main} />
                     </View>
-                    <Text style={styles.updateLabel}>Sessions</Text>
-                    <Text style={styles.updateValue}>{profile.upcoming_sessions}</Text>
-                    <Text style={styles.updateSubtext}>upcoming</Text>
+                    <Text style={[styles.updateLabel, { color: isDarkMode ? 'rgba(255, 255, 255, 0.7)' : theme.COLORS.text.secondary }]}>Sessions</Text>
+                    <Text style={[styles.updateValue, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>{profile.upcoming_sessions}</Text>
+                    <Text style={[styles.updateSubtext, { color: isDarkMode ? 'rgba(255, 255, 255, 0.5)' : theme.COLORS.text.secondary }]}>upcoming</Text>
                   </View>
 
                   {/* Latest Performance */}
                   {profile.company_data.performance.length > 0 && (
-                    <View style={styles.updateCard}>
-                      <View style={styles.updateIconContainer}>
+                    <View style={[styles.updateCard, { backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.8)' }]}>
+                      <View style={[styles.updateIconContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.1)' : `${theme.COLORS.primary.main}20` }]}>
                         <Ionicons name="trophy" size={24} color={theme.COLORS.primary.main} />
                       </View>
-                      <Text style={styles.updateLabel}>Performance</Text>
-                      <Text style={styles.updateValue}>
+                      <Text style={[styles.updateLabel, { color: isDarkMode ? 'rgba(255, 255, 255, 0.7)' : theme.COLORS.text.secondary }]}>Performance</Text>
+                      <Text style={[styles.updateValue, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
                         {profile.company_data.performance[0].Performance_Rating}/5
                       </Text>
-                      <Text style={styles.updateSubtext}>
+                      <Text style={[styles.updateSubtext, { color: isDarkMode ? 'rgba(255, 255, 255, 0.5)' : theme.COLORS.text.secondary }]}>
                         {profile.company_data.performance[0].Manager_Feedback}
                       </Text>
                     </View>
@@ -552,15 +569,15 @@ export default function HomeScreen() {
 
                   {/* Latest Activity */}
                   {profile.company_data.activity.length > 0 && (
-                    <View style={[styles.updateCard, styles.updateCardWide]}>
-                      <View style={styles.updateIconContainer}>
+                    <View style={[styles.updateCard, styles.updateCardWide, { backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.8)' }]}>
+                      <View style={[styles.updateIconContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.1)' : `${theme.COLORS.primary.main}20` }]}>
                         <Ionicons name="time" size={24} color={theme.COLORS.primary.main} />
                       </View>
-                      <Text style={styles.updateLabel}>Today's Work</Text>
-                      <Text style={styles.updateValue}>
+                      <Text style={[styles.updateLabel, { color: isDarkMode ? 'rgba(255, 255, 255, 0.7)' : theme.COLORS.text.secondary }]}>Today's Work</Text>
+                      <Text style={[styles.updateValue, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
                         {profile.company_data.activity[0].Work_Hours}h
                       </Text>
-                      <Text style={styles.updateSubtext}>
+                      <Text style={[styles.updateSubtext, { color: isDarkMode ? 'rgba(255, 255, 255, 0.5)' : theme.COLORS.text.secondary }]}>
                         {profile.company_data.activity[0].Meetings_Attended} meetings
                       </Text>
                     </View>
@@ -572,12 +589,12 @@ export default function HomeScreen() {
           
 
           {/* Recent Chats Section */}
-          <View style={styles.section}>
+          <View style={[styles.section, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.9)' }]}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="chatbubbles-outline" size={24} color="white" />
-              <Text style={styles.sectionTitle}>Recent Chats</Text>
+              <Ionicons name="chatbubbles-outline" size={24} color={isDarkMode ? 'white' : theme.COLORS.primary.main} />
+              <Text style={[styles.sectionTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>Recent Chats</Text>
             </View>
-            <Text style={styles.sectionSubtitle}>Your recent conversations</Text>
+            <Text style={[styles.sectionSubtitle, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>Your recent conversations</Text>
 
             {loading && page === 1 ? (
               <View style={styles.chatList}>
@@ -592,27 +609,33 @@ export default function HomeScreen() {
                 {chats.map((chat, index) => (
                   <TouchableOpacity 
                     key={chat.chat_id} 
-                    style={styles.chatItem}
+                    style={[styles.chatItem, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.8)' }]}
                     onPress={() => showChat(chat.chat_id)}
                   >
-                    <View style={styles.chatIconContainer}>
+                    <View style={[styles.chatIconContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.1)' : `${theme.COLORS.primary.main}20` }]}>
                       <Ionicons 
-                        name={chat.is_escalated ? "alert-circle" : "chatbubble-outline"} 
+                        name={chat.is_escalated ? "warning-outline" : "chatbubble-outline"} 
                         size={24} 
-                        color={chat.is_escalated ? theme.COLORS.error : theme.COLORS.primary.main} 
+                        color={theme.COLORS.primary.main} 
                       />
                     </View>
                     <View style={styles.chatInfo}>
                       <View style={styles.chatHeader}>
-                        <Text style={styles.chatTitle}>Chat #{chat.chat_id}</Text>
-                        <Text style={styles.chatTime}>{formatDate(chat.last_message_time)}</Text>
+                        <Text style={[styles.chatTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
+                          {chat.chat_mode === 'ai' ? 'AI Assistant' : 'Human Support'}
+                        </Text>
+                        <Text style={[styles.chatTime, { color: isDarkMode ? 'rgba(255,255,255,0.5)' : theme.COLORS.text.secondary }]}>
+                          {formatDate(chat.last_message_time)}
+                        </Text>
                       </View>
-                      <Text style={styles.chatMessage} numberOfLines={1}>
+                      <Text style={[styles.chatMessage, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]} numberOfLines={1}>
                         {chat.last_message}
                       </Text>
                       {chat.unread_count > 0 && (
-                        <View style={styles.unreadBadge}>
-                          <Text style={styles.unreadCount}>{chat.unread_count}</Text>
+                        <View style={[styles.unreadBadge, { backgroundColor: theme.COLORS.primary.main }]}>
+                          <Text style={[styles.unreadBadgeText, { color: theme.COLORS.background.paper }]}>
+                            {chat.unread_count}
+                          </Text>
                         </View>
                       )}
                     </View>
@@ -621,14 +644,14 @@ export default function HomeScreen() {
 
                 {hasMore && (
                   <TouchableOpacity 
-                    style={styles.loadMoreButton} 
+                    style={[styles.loadMoreButton, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.2)' : `${theme.COLORS.primary.main}20` }]} 
                     onPress={loadMore}
                     disabled={loading}
                   >
                     {loading ? (
-                      <ActivityIndicator size="small" color="white" />
+                      <ActivityIndicator size="small" color={isDarkMode ? 'white' : theme.COLORS.primary.main} />
                     ) : (
-                      <Text style={styles.loadMoreText}>Load More</Text>
+                      <Text style={[styles.loadMoreText, { color: isDarkMode ? 'white' : theme.COLORS.primary.main }]}>Load More</Text>
                     )}
                   </TouchableOpacity>
                 )}
@@ -638,11 +661,13 @@ export default function HomeScreen() {
 
           {/* Chat Button */}
           <TouchableOpacity 
-            style={styles.chatButton}
+            style={[styles.chatButton, { backgroundColor: theme.COLORS.primary.main }]}
             onPress={() => showChat()}
           >
-            <Ionicons name="chatbubbles-outline" size={24} color="white" />
-            <Text style={styles.chatButtonText}>Open Chat</Text>
+            <Ionicons name="add" size={24} color={theme.COLORS.background.paper} />
+            <Text style={[styles.chatButtonText, { color: theme.COLORS.background.paper }]}>
+              New Chat
+            </Text>
           </TouchableOpacity>
         </ScrollView>
 
@@ -654,20 +679,17 @@ export default function HomeScreen() {
               {
                 transform: [{ translateY: chatTranslateY }],
                 opacity: chatOpacity,
-                height: chatHeight.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, Dimensions.get('window').height],
-                }),
+                backgroundColor: theme.COLORS.background.paper,
               },
             ]}
             {...panResponder.panHandlers}
           >
-            {/* <View style={styles.chatHeader}>
+            <View style={styles.chatHeader}>
               <View style={styles.chatHandle} />
               <TouchableOpacity onPress={dismissChat} style={styles.closeButton}>
                 <Ionicons name="close" size={24} color={theme.COLORS.text.primary} />
               </TouchableOpacity>
-            </View> */}
+            </View>
             <ChatScreen 
               onClose={dismissChat} 
               initialChatId={selectedChatId} 
@@ -832,10 +854,9 @@ const styles = StyleSheet.create({
   chatItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)', // Darker background for chat items
     padding: moderateScale(16),
     borderRadius: 8,
-    marginBottom: verticalScale(8),
+    marginBottom: verticalScale(12),
   },
   chatInfo: {
     marginLeft: horizontalScale(12),
@@ -883,7 +904,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 8,
   },
-  unreadCount: {
+  unreadBadgeText: {
     color: 'white',
     fontSize: fontScale(12),
     fontWeight: 'bold',
@@ -928,7 +949,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.COLORS.primary.main,
     padding: moderateScale(16),
     borderRadius: 8,
     margin: horizontalScale(16),
@@ -947,7 +967,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: theme.COLORS.border.main,
+    backgroundColor: theme.COLORS.background.paper,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     overflow: 'hidden',
@@ -1034,5 +1054,13 @@ const styles = StyleSheet.create({
   subtextContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  chatContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chatPlaceholder: {
+    fontSize: fontScale(16),
   },
 });

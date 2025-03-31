@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
 import { fontScale, horizontalScale, moderateScale, verticalScale } from '../../utils/scaling';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import { API_URL } from '../../constants/api';
 
@@ -31,6 +32,7 @@ interface ChatHistory {
   lastMessage: string;
   timestamp: Date;
   unreadCount: number;
+  messages: Message[];
 }
 
 interface ScheduledSession {
@@ -47,6 +49,14 @@ interface ScheduledSession {
   notes: string;
 }
 
+interface ChatData {
+  id: string;
+  last_message: string;
+  created_at: string;
+  unread_count: number;
+  messages: any[];
+}
+
 interface ChatScreenProps {
   onClose: () => void;
   initialChatId?: string | null;
@@ -55,38 +65,20 @@ interface ChatScreenProps {
 
 export default function ChatScreen({ onClose, initialChatId, isReadOnly = false }: ChatScreenProps) {
   const { accessToken, refreshAccessToken, logout } = useAuth();
+  const { theme, isDarkMode } = useTheme();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [activeSession, setActiveSession] = useState<ScheduledSession | null>(null);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(initialChatId || null);
-  const [chatHistory] = useState<ChatHistory[]>([
-    {
-      id: '1',
-      lastMessage: 'Hello! How can I help you today?',
-      timestamp: new Date(),
-      unreadCount: 0,
-    },
-    {
-      id: '2',
-      lastMessage: 'Thanks for your help!',
-      timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000),
-      unreadCount: 2,
-    },
-    // Add more chat history items as needed
-  ]);
+  const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
   const flatListRef = useRef<FlatList>(null);
   const router = useRouter();
 
   useEffect(() => {
-    if (initialChatId) {
-      setSelectedChatId(initialChatId);
-      loadChatMessages(initialChatId);
-    } else {
-      fetchScheduledSessions();
-    }
-  }, [initialChatId]);
+    fetchAllChats();
+  }, []);
 
   const handleAuthError = async (error: any) => {
     if (error.message === 'Failed to fetch scheduled sessions' || 
@@ -105,7 +97,7 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
     return false;
   };
 
-  const fetchScheduledSessions = async () => {
+  const fetchAllChats = async () => {
     if (!accessToken) {
       console.error('No access token available');
       setIsLoading(false);
@@ -114,60 +106,58 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
 
     try {
       setIsLoading(true);
-      const response = await fetch(
-        `${API_URL}/employee/scheduled-sessions`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-          },
-        }
-      );
-      console.log('response', response);
-      
+      const response = await fetch(`${API_URL}/employee/chats`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+
       if (!response.ok) {
-        throw new Error('Failed to fetch scheduled sessions');
+        throw new Error('Failed to fetch chats');
       }
 
       const data = await response.json();
-      const activeSession = data.sessions.find((session: ScheduledSession) => session.status === 'active');
-      setActiveSession(activeSession || null);
+      const formattedChats = data.chats.map((chat: ChatData) => ({
+        id: chat.id,
+        lastMessage: chat.last_message || 'No messages yet',
+        timestamp: new Date(chat.created_at),
+        unreadCount: chat.unread_count || 0,
+        messages: chat.messages || [],
+      }));
 
-      if (activeSession) {
-        setMessages([
-          {
-            id: '1',
-            text: `Hello! You have an active session scheduled for ${new Date(activeSession.scheduled_at).toLocaleString()}. How can I help you today?`,
-            isUser: false,
-            timestamp: new Date(),
-          },
-        ]);
+      setChatHistory(formattedChats);
+      
+      // If there's an initial chat ID, load its messages
+      if (initialChatId) {
+        const selectedChat = formattedChats.find((chat: ChatData) => chat.id === initialChatId);
+        if (selectedChat) {
+          setSelectedChatId(initialChatId);
+          setMessages(selectedChat.messages);
+        }
       }
     } catch (error) {
-      console.error('Error fetching scheduled sessions:', error);
+      console.error('Error fetching chats:', error);
       const shouldRetry = await handleAuthError(error);
       if (shouldRetry) {
-        fetchScheduledSessions(); // Retry the fetch with new token
+        fetchAllChats();
       }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const loadChatMessages = async (chatId: string) => {
-    if (!accessToken) {
-      console.error('No access token available');
-      setIsLoading(false);
-      return;
-    }
+  const handleChatSelect = async (chatId: string) => {
+    setSelectedChatId(chatId);
+    setActiveSession(null);
+    setIsSidebarOpen(false);
 
     try {
-      setIsLoading(true);
       const response = await fetch(`${API_URL}/employee/chats/${chatId}/messages`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
         },
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to load chat messages');
       }
@@ -182,22 +172,19 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
 
       setMessages(formattedMessages);
       scrollToBottom();
+
+      // Update chat history with new messages
+      setChatHistory(prev => prev.map(chat => 
+        chat.id === chatId 
+          ? { ...chat, messages: formattedMessages, lastMessage: formattedMessages[formattedMessages.length - 1]?.text || chat.lastMessage }
+          : chat
+      ));
     } catch (error) {
       console.error('Error loading chat messages:', error);
       const shouldRetry = await handleAuthError(error);
       if (shouldRetry) {
-        loadChatMessages(chatId);
+        handleChatSelect(chatId);
       }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const scrollToBottom = () => {
-    if (flatListRef.current) {
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
     }
   };
 
@@ -210,6 +197,7 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
       isUser: true,
       timestamp: new Date(),
     };
+
     setMessages(prev => [...prev, newMessage]);
     setInputText('');
     scrollToBottom();
@@ -241,8 +229,21 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
         isUser: false,
         timestamp: new Date(),
       };
+
       setMessages(prev => [...prev, aiResponse]);
       scrollToBottom();
+
+      // Update chat history with new messages
+      setChatHistory(prev => prev.map(chat => 
+        chat.id === selectedChatId 
+          ? { 
+              ...chat, 
+              messages: [...chat.messages, newMessage, aiResponse],
+              lastMessage: aiResponse.text,
+              unreadCount: 0
+            }
+          : chat
+      ));
     } catch (error) {
       console.error('Error sending message:', error);
       const shouldRetry = await handleAuthError(error);
@@ -261,18 +262,52 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
     }
   };
 
-  const handleChatSelect = (chatId: string) => {
-    setSelectedChatId(chatId);
-    setActiveSession(null); // Clear active session when selecting a chat
-    toggleSidebar();
+  const scrollToBottom = () => {
+    if (flatListRef.current) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
   };
 
   const renderMessage = ({ item }: { item: Message }) => (
-    <View style={[styles.messageContainer, item.isUser ? styles.userMessage : styles.aiMessage]}>
-      <Text style={styles.messageText}>{item.text}</Text>
-      <Text style={styles.timestamp}>
-        {item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-      </Text>
+    <View style={[
+      styles.messageContainer, 
+      item.isUser ? [
+        styles.userMessage,
+        { borderBottomRightRadius: 4 }
+      ] : [
+        styles.aiMessage,
+        { 
+          backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.05)',
+          borderBottomLeftRadius: 4 
+        }
+      ]
+    ]}>
+      {!item.isUser && (
+        <View style={[styles.profileCircle, { 
+          backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.2)' : `${theme.COLORS.primary.main}20` 
+        }]}>
+          <Ionicons name="leaf-outline" size={20} color={theme.COLORS.primary.main} />
+        </View>
+      )}
+      <View style={[
+        styles.messageContent,
+        item.isUser ? { borderBottomRightRadius: 4 } : { borderBottomLeftRadius: 4 }
+      ]}>
+        <Text style={[
+          styles.messageText,
+          { color: item.isUser ? 'white' : (isDarkMode ? 'white' : theme.COLORS.text.primary) }
+        ]}>
+          {item.text}
+        </Text>
+        <Text style={[
+          styles.timestamp,
+          { color: item.isUser ? 'rgba(255,255,255,0.7)' : (isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)') }
+        ]}>
+          {item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </Text>
+      </View>
     </View>
   );
 
@@ -315,7 +350,91 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { 
+      backgroundColor: isDarkMode ? '#121212' : '#F5F5F5',
+      marginTop: -20
+    }]} edges={['bottom', 'left', 'right']}>
+      <View style={styles.mainContent}>
+        <View style={[styles.header, { 
+          backgroundColor: isDarkMode ? 'rgba(0,0,0,0.8)' : 'white',
+          borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
+        }]}>
+          <TouchableOpacity onPress={toggleSidebar} style={styles.menuButton}>
+            <Ionicons name="menu" size={24} color={isDarkMode ? 'white' : theme.COLORS.text.primary} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
+            {selectedChatId ? `Chat #${selectedChatId}` : 'New Chat'}
+          </Text>
+          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <Ionicons name="close" size={24} color={isDarkMode ? 'white' : theme.COLORS.text.primary} />
+          </TouchableOpacity>
+        </View>
+
+        {!activeSession && !selectedChatId ? (
+          <View style={[styles.noSessionContainer, { 
+            backgroundColor: isDarkMode ? '#121212' : '#F5F5F5' 
+          }]}>
+            <Ionicons name="calendar-outline" size={48} color={theme.COLORS.text.secondary} />
+            <Text style={styles.noSessionTitle}>No Active Session</Text>
+            <Text style={styles.noSessionText}>
+              You don't have any scheduled chat sessions at the moment.
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            renderItem={renderMessage}
+            keyExtractor={item => item.id}
+            contentContainerStyle={[styles.messageList, {
+              backgroundColor: isDarkMode ? '#121212' : '#F5F5F5'
+            }]}
+            onContentSizeChange={scrollToBottom}
+            onLayout={scrollToBottom}
+          />
+        )}
+
+        {(!isReadOnly && (activeSession || selectedChatId)) && (
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.content}>
+            <View style={[styles.inputContainer, {
+              backgroundColor: isDarkMode ? 'rgba(0,0,0,0.8)' : 'white',
+              borderTopColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
+            }]}>
+              <TextInput
+                style={[styles.input, {
+                  backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.05)',
+                  color: isDarkMode ? 'white' : theme.COLORS.text.primary,
+                  borderRadius: 20,
+                }]}
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder="Type your message..."
+                placeholderTextColor={isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)'}
+                multiline
+              />
+              <TouchableOpacity
+                style={[
+                  styles.sendButton, 
+                  { 
+                    backgroundColor: inputText.trim() ? '#1C8D3A' : (isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.05)'),
+                    opacity: !inputText.trim() ? 0.5 : 1
+                  }
+                ]}
+                onPress={sendMessage}
+                disabled={!inputText.trim()}>
+                <Ionicons
+                  name="send"
+                  size={24}
+                  color={inputText.trim() ? 'white' : (isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)')}
+                />
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        )}
+      </View>
+
       {/* Sidebar */}
       {isSidebarOpen && (
         <View style={styles.sidebar}>
@@ -333,68 +452,6 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
           />
         </View>
       )}
-
-      {/* Main Chat UI */}
-      <View style={styles.mainContent}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={toggleSidebar} style={styles.menuButton}>
-            <Ionicons name="menu" size={24} color={theme.COLORS.text.primary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>
-            {selectedChatId ? `Chat #${selectedChatId}` : 'New Chat'}
-          </Text>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Ionicons name="close" size={24} color={theme.COLORS.text.primary} />
-          </TouchableOpacity>
-        </View>
-
-        {!activeSession && !selectedChatId ? (
-          <View style={styles.noSessionContainer}>
-            <Ionicons name="calendar-outline" size={48} color={theme.COLORS.text.secondary} />
-            <Text style={styles.noSessionTitle}>No Active Session</Text>
-            <Text style={styles.noSessionText}>
-              You don't have any scheduled chat sessions at the moment.
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            renderItem={renderMessage}
-            keyExtractor={item => item.id}
-            contentContainerStyle={styles.messageList}
-            onContentSizeChange={scrollToBottom}
-            onLayout={scrollToBottom}
-          />
-        )}
-
-        {(!isReadOnly && (activeSession || selectedChatId)) && (
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.content}>
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                value={inputText}
-                onChangeText={setInputText}
-                placeholder="Type your message..."
-                placeholderTextColor={theme.COLORS.text.secondary}
-                multiline
-              />
-              <TouchableOpacity
-                style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
-                onPress={sendMessage}
-                disabled={!inputText.trim()}>
-                <Ionicons
-                  name="send"
-                  size={24}
-                  color={inputText.trim() ? theme.COLORS.primary.main : theme.COLORS.text.secondary}
-                />
-              </TouchableOpacity>
-            </View>
-          </KeyboardAvoidingView>
-        )}
-      </View>
     </SafeAreaView>
   );
 }
@@ -402,7 +459,6 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.COLORS.background.default,
   },
   mainContent: {
     flex: 1,
@@ -411,9 +467,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: moderateScale(16),
+    paddingTop: moderateScale(8),
     borderBottomWidth: 1,
-    borderBottomColor: theme.COLORS.border.main,
-    backgroundColor: theme.COLORS.background.paper,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(0,0,0,0.8)',
   },
   menuButton: {
     marginRight: horizontalScale(16),
@@ -423,7 +480,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: fontScale(20),
-    color: theme.COLORS.text.primary,
+    color: 'white',
     ...theme.FONTS.medium,
   },
   sidebar: {
@@ -504,17 +561,23 @@ const styles = StyleSheet.create({
   },
   messageContainer: {
     maxWidth: '80%',
-    padding: moderateScale(12),
-    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     marginBottom: verticalScale(8),
+  },
+  messageContent: {
+    padding: moderateScale(12),
+    borderRadius: 20,
+    flex: 1,
   },
   userMessage: {
     alignSelf: 'flex-end',
     backgroundColor: '#1C8D3A',
+    borderRadius: 20,
   },
   aiMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: theme.COLORS.background.paper,
+    borderRadius: 20,
   },
   messageText: {
     color: theme.COLORS.text.primary,
@@ -523,27 +586,22 @@ const styles = StyleSheet.create({
   },
   timestamp: {
     fontSize: fontScale(12),
-    color: theme.COLORS.text.secondary,
+    color: 'rgba(255,255,255,0.5)',
     marginTop: verticalScale(4),
     ...theme.FONTS.regular,
   },
   inputContainer: {
     flexDirection: 'row',
     padding: moderateScale(16),
-    backgroundColor: theme.COLORS.background.paper,
     borderTopWidth: 1,
-    borderTopColor: theme.COLORS.border.main,
   },
   input: {
     flex: 1,
     minHeight: verticalScale(40),
     maxHeight: verticalScale(100),
-    backgroundColor: theme.COLORS.background.paper,
-    borderRadius: 20,
     paddingHorizontal: horizontalScale(16),
     paddingVertical: verticalScale(8),
     marginRight: horizontalScale(8),
-    color: theme.COLORS.text.primary,
     fontSize: fontScale(16),
     ...theme.FONTS.regular,
   },
@@ -551,12 +609,8 @@ const styles = StyleSheet.create({
     width: horizontalScale(40),
     height: verticalScale(40),
     borderRadius: 20,
-    backgroundColor: theme.COLORS.background.paper,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  sendButtonDisabled: {
-    opacity: 0.5,
   },
   loadingContainer: {
     flex: 1,
@@ -588,5 +642,14 @@ const styles = StyleSheet.create({
   },
   selectedChatItem: {
   backgroundColor: theme.COLORS.background.paper,
+  },
+  profileCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: horizontalScale(8),
+    marginTop: verticalScale(4),
   },
 }); 

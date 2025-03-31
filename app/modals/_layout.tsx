@@ -6,6 +6,11 @@ export default function ModalsLayout() {
       screenOptions={{
         headerShown: false,
         presentation: 'modal',
+        contentStyle: {
+          marginTop: 0,
+          paddingTop: 0,
+        },
+        animation: 'slide_from_bottom',
       }}
     />
   );

@@ -21,19 +21,37 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ],
   ios: {
     supportsTablet: true,
-    bundleIdentifier: 'com.yourcompany.employeeportal'
+    bundleIdentifier: 'com.yourcompany.employeeportal',
+    infoPlist: {
+      UIBackgroundModes: ['remote-notification']
+    }
   },
   android: {
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
       backgroundColor: '#000000'
     },
-    package: 'com.yourcompany.employeeportal'
+    package: 'com.yourcompany.employeeportal',
+    googleServicesFile: './google-services.json',
+    permissions: ['NOTIFICATIONS']
   },
   web: {
     favicon: './assets/favicon.png'
   },
   plugins: [
-    'expo-router'
-  ]
+    'expo-router',
+    [
+      'expo-notifications',
+      {
+        icon: './assets/notification-icon.png',
+        color: '#1C8D3A',
+        sounds: ['./assets/notification.wav']
+      }
+    ]
+  ],
+  extra: {
+    eas: {
+      projectId: "your-project-id"
+    }
+  }
 }); 

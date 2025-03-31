@@ -10,7 +10,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import theme from '../../constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '../../contexts/ThemeContext';
 import { horizontalScale, verticalScale, moderateScale, fontScale } from '../../utils/responsive';
 import { useAuth } from '../../contexts/AuthContext';
 import { API_URL } from '../../constants/api';
@@ -22,14 +23,13 @@ interface EmployeeProfile {
   email: string;
   role: string;
   manager_id: string;
-  is_blocked: boolean;
 }
 
 interface ProfileMenuItem {
   icon: string;
   title: string;
   subtitle?: string;
-  onPress: () => void;
+  onPress?: () => void;
 }
 
 const profileMenuItems: ProfileMenuItem[] = [
@@ -97,20 +97,18 @@ export const ProfileShimmer = () => (
 
 export default function ProfileScreen() {
   const { logout, accessToken } = useAuth();
+  const { theme, isDarkMode } = useTheme();
   const [profile, setProfile] = useState<EmployeeProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `${API_URL}/employee/profile`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-          },
-        }
-      );
+      const response = await fetch(`${API_URL}/employee/profile`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
       
       if (!response.ok) {
         throw new Error('Failed to fetch profile');
@@ -139,7 +137,7 @@ export default function ProfileScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.COLORS.background.default }]}>
         <ScrollView style={styles.scrollView}>
           <ProfileShimmer />
         </ScrollView>
@@ -149,83 +147,98 @@ export default function ProfileScreen() {
 
   if (!profile) {
     return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Failed to load profile data</Text>
+      <View style={[styles.errorContainer, { backgroundColor: theme.COLORS.background.default }]}>
+        <Text style={[styles.errorText, { color: theme.COLORS.error }]}>Failed to load profile data</Text>
       </View>
     );
   }
 
+  const gradientColors = isDarkMode 
+    ? ['#1C8D3A', '#165C27', '#0A3814']
+    : ['#E8F5E9', '#C8E6C9', '#A5D6A7'];
+
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
-        {/* Profile Header */}
-        <View style={styles.header}>
-          <View style={styles.circleContainer}>
-            <Text style={styles.employeeId}>{profile.employee_id}</Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.COLORS.background.default }]}>
+      <LinearGradient
+        colors={gradientColors}
+        style={styles.gradientBackground}
+      >
+        <ScrollView style={styles.scrollView}>
+          {/* Profile Header */}
+          <View style={styles.header}>
+            <View style={[styles.circleContainer, { backgroundColor: theme.COLORS.primary.main }]}>
+              <Text style={[styles.employeeId, { color: theme.COLORS.background.paper }]}>
+                {profile.employee_id}
+              </Text>
+            </View>
           </View>
-        </View>
 
-        {/* Profile Information */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="person-outline" size={24} color="white" />
-            <Text style={styles.sectionTitle}>Profile Information</Text>
-          </View>
-          <View style={styles.profileInfo}>
-            <View style={styles.infoRow}>
-              <Text style={styles.label}>Employee ID</Text>
-              <Text style={styles.value}>{profile.employee_id}</Text>
+          {/* Profile Information */}
+          <View style={[styles.section, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.9)' }]}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="person-outline" size={24} color={isDarkMode ? 'white' : theme.COLORS.primary.main} />
+              <Text style={[styles.sectionTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
+                Profile Information
+              </Text>
             </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.label}>Email</Text>
-              <Text style={styles.value}>{profile.email}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.label}>Role</Text>
-              <Text style={styles.value}>{profile.role}</Text>
-            </View>
-            {profile.manager_id && (
+            <View style={styles.profileInfo}>
               <View style={styles.infoRow}>
-                <Text style={styles.label}>Manager ID</Text>
-                <Text style={styles.value}>{profile.manager_id}</Text>
+                <Text style={[styles.label, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>Employee ID</Text>
+                <Text style={[styles.value, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>{profile.employee_id}</Text>
               </View>
-            )}
+              <View style={styles.infoRow}>
+                <Text style={[styles.label, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>Email</Text>
+                <Text style={[styles.value, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>{profile.email}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={[styles.label, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>Role</Text>
+                <Text style={[styles.value, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>{profile.role}</Text>
+              </View>
+              {profile.manager_id && (
+                <View style={styles.infoRow}>
+                  <Text style={[styles.label, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>Manager ID</Text>
+                  <Text style={[styles.value, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>{profile.manager_id}</Text>
+                </View>
+              )}
+            </View>
           </View>
-        </View>
 
-        {/* Profile Menu */}
-        <View style={styles.menuContainer}>
-          {profileMenuItems.map((item, index) => (
-            <TouchableOpacity
-              key={index}
-              style={styles.menuItem}
-              onPress={item.onPress}
-            >
-              <View style={styles.menuItemLeft}>
-                <View style={styles.iconContainer}>
-                  <Ionicons name={item.icon as any} size={24} color={theme.COLORS.primary.main} />
+          {/* Profile Menu */}
+          <View style={styles.menuContainer}>
+            {profileMenuItems.map((item, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[styles.menuItem, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.9)' }]}
+                onPress={item.onPress}
+              >
+                <View style={styles.menuItemLeft}>
+                  <View style={[styles.iconContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.1)' : `${theme.COLORS.primary.main}10` }]}>
+                    <Ionicons name={item.icon as any} size={24} color={theme.COLORS.primary.main} />
+                  </View>
+                  <View style={styles.menuItemText}>
+                    <Text style={[styles.menuItemTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>{item.title}</Text>
+                    {item.subtitle && (
+                      <Text style={[styles.menuItemSubtitle, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
+                        {item.subtitle}
+                      </Text>
+                    )}
+                  </View>
                 </View>
-                <View style={styles.menuItemText}>
-                  <Text style={styles.menuItemTitle}>{item.title}</Text>
-                  {item.subtitle && (
-                    <Text style={styles.menuItemSubtitle}>{item.subtitle}</Text>
-                  )}
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={24} color={theme.COLORS.text.secondary} />
-            </TouchableOpacity>
-          ))}
-        </View>
+                <Ionicons name="chevron-forward" size={24} color={isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary} />
+              </TouchableOpacity>
+            ))}
+          </View>
 
-        {/* Logout Button */}
-        <TouchableOpacity
-          style={styles.logoutButton}
-          onPress={handleLogout}
-        >
-          <Ionicons name="log-out-outline" size={24} color={theme.COLORS.error} />
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
-      </ScrollView>
+          {/* Logout Button */}
+          <TouchableOpacity
+            style={[styles.logoutButton, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.9)' }]}
+            onPress={handleLogout}
+          >
+            <Ionicons name="log-out-outline" size={24} color={theme.COLORS.error} />
+            <Text style={[styles.logoutText, { color: theme.COLORS.error }]}>Logout</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </LinearGradient>
     </SafeAreaView>
   );
 }
@@ -233,7 +246,9 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.COLORS.background.default,
+  },
+  gradientBackground: {
+    flex: 1,
   },
   scrollView: {
     flex: 1,
@@ -249,7 +264,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   errorText: {
-    color: theme.COLORS.error,
     fontSize: fontScale(16),
   },
   header: {
@@ -261,24 +275,20 @@ const styles = StyleSheet.create({
     width: horizontalScale(120),
     height: horizontalScale(120),
     borderRadius: horizontalScale(60),
-    backgroundColor: theme.COLORS.primary.main,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: verticalScale(24),
   },
   employeeId: {
-    color: theme.COLORS.background.paper,
     fontSize: fontScale(20),
-    ...theme.FONTS.bold,
+    fontWeight: '700',
   },
   section: {
     padding: horizontalScale(16),
     marginBottom: verticalScale(16),
-    backgroundColor: 'rgba(28, 141, 58, 0.1)',
     borderRadius: 12,
     marginHorizontal: horizontalScale(16),
     borderWidth: 1,
-    borderColor: 'rgba(28, 141, 58, 0.2)',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -286,9 +296,8 @@ const styles = StyleSheet.create({
     marginBottom: verticalScale(16),
   },
   sectionTitle: {
-    color: theme.COLORS.text.primary,
     fontSize: fontScale(20),
-    ...theme.FONTS.bold,
+    fontWeight: '700',
     marginLeft: horizontalScale(8),
   },
   profileInfo: {
@@ -300,13 +309,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   label: {
-    color: theme.COLORS.text.secondary,
     fontSize: fontScale(14),
   },
   value: {
-    color: theme.COLORS.text.primary,
     fontSize: fontScale(14),
-    ...theme.FONTS.medium,
+    fontWeight: '500',
   },
   menuContainer: {
     padding: horizontalScale(16),
@@ -316,7 +323,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: theme.COLORS.background.paper,
     padding: moderateScale(16),
     borderRadius: 8,
     marginBottom: verticalScale(8),
@@ -330,7 +336,6 @@ const styles = StyleSheet.create({
     width: horizontalScale(40),
     height: horizontalScale(40),
     borderRadius: horizontalScale(20),
-    backgroundColor: `${theme.COLORS.primary.main}20`,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: horizontalScale(12),
@@ -339,30 +344,26 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   menuItemTitle: {
-    color: theme.COLORS.text.primary,
     fontSize: fontScale(16),
-    ...theme.FONTS.medium,
+    fontWeight: '500',
     marginBottom: verticalScale(4),
   },
   menuItemSubtitle: {
-    color: theme.COLORS.text.secondary,
     fontSize: fontScale(14),
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.COLORS.background.paper,
     padding: moderateScale(16),
     borderRadius: 8,
-    margin: horizontalScale(16),
+    marginHorizontal: horizontalScale(16),
     marginTop: verticalScale(24),
     marginBottom: verticalScale(32),
   },
   logoutText: {
-    color: theme.COLORS.error,
     fontSize: fontScale(16),
-    ...theme.FONTS.medium,
+    fontWeight: '500',
     marginLeft: horizontalScale(8),
   },
   profileContainer: {

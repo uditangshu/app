@@ -13,18 +13,18 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { theme } from '../../constants/theme';
-import { horizontalScale, verticalScale, moderateScale, fontScale } from '../../utils/responsive';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
+import { horizontalScale, verticalScale, moderateScale, fontScale } from '../../utils/responsive';
 import { API_URL } from '../../constants/api';
 
 export default function LoginScreen() {
-  const [employee_id, setEmployeeId] = useState('');
+  const [employee_id, setEmployee_id] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, isLoading } = useAuth();
+  const { theme } = useTheme();
   const router = useRouter();
 
   const handleLogin = async () => {
@@ -34,7 +34,6 @@ export default function LoginScreen() {
     }
 
     try {
-      setIsLoading(true);
       setError('');
       const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
@@ -54,13 +53,11 @@ export default function LoginScreen() {
       await login(employee_id, password);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Login failed');
-    } finally {
-      setIsLoading(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.COLORS.background.default }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoidingView}
@@ -68,34 +65,37 @@ export default function LoginScreen() {
         <View style={styles.content}>
           {/* Logo and Title */}
           <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <Ionicons name="business-outline" size={60} color={theme.COLORS.primary.main} />
+            <View style={[styles.logoContainer, { backgroundColor: `${theme.COLORS.primary.main}20` }]}>
+              <Ionicons name="leaf-outline" size={40} color={theme.COLORS.primary.main} />
             </View>
-            <Text style={styles.title}>Welcome Back</Text>
-            <Text style={styles.subtitle}>Sign in to continue</Text>
+            <Text style={[styles.title, { color: theme.COLORS.text.primary }]}>Welcome Back</Text>
+            <Text style={[styles.subtitle, { color: theme.COLORS.text.secondary }]}>
+              Sign in to continue
+            </Text>
           </View>
 
           {/* Login Form */}
           <View style={styles.form}>
             {/* Email Input */}
-            <View style={styles.inputContainer}>
-              <Ionicons name="mail-outline" size={20} color={theme.COLORS.text.secondary} />
+            <View style={[styles.inputContainer, { backgroundColor: theme.COLORS.background.paper }]}>
+              <Ionicons name="mail-outline" size={24} color={theme.COLORS.text.secondary} />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: theme.COLORS.text.primary }]}
                 placeholder="Employee ID"
                 placeholderTextColor={theme.COLORS.text.secondary}
                 value={employee_id}
-                onChangeText={setEmployeeId}
+                onChangeText={setEmployee_id}
+                keyboardType="email-address"
                 autoCapitalize="none"
-                autoComplete="off"
+                autoComplete="email"
               />
             </View>
 
             {/* Password Input */}
-            <View style={styles.inputContainer}>
-              <Ionicons name="lock-closed-outline" size={20} color={theme.COLORS.text.secondary} />
+            <View style={[styles.inputContainer, { backgroundColor: theme.COLORS.background.paper }]}>
+              <Ionicons name="lock-closed-outline" size={24} color={theme.COLORS.text.secondary} />
               <TextInput
-                style={[styles.input, { flex: 1 }]}
+                style={[styles.input, { color: theme.COLORS.text.primary }]}
                 placeholder="Password"
                 placeholderTextColor={theme.COLORS.text.secondary}
                 value={password}
@@ -103,30 +103,36 @@ export default function LoginScreen() {
                 secureTextEntry={!showPassword}
               />
               <TouchableOpacity
-                onPress={() => setShowPassword(!showPassword)}
                 style={styles.eyeIcon}
+                onPress={() => setShowPassword(!showPassword)}
               >
                 <Ionicons
                   name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                  size={20}
+                  size={24}
                   color={theme.COLORS.text.secondary}
                 />
               </TouchableOpacity>
             </View>
 
             {/* Error Message */}
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            {error ? <Text style={[styles.errorText, { color: theme.COLORS.error }]}>{error}</Text> : null}
 
             {/* Login Button */}
             <TouchableOpacity
-              style={[styles.button, isLoading && styles.buttonDisabled]}
+              style={[
+                styles.button,
+                { backgroundColor: theme.COLORS.primary.main },
+                isLoading && styles.buttonDisabled,
+              ]}
               onPress={handleLogin}
               disabled={isLoading}
             >
               {isLoading ? (
                 <ActivityIndicator color={theme.COLORS.text.primary} />
               ) : (
-                <Text style={styles.buttonText}>Sign In</Text>
+                <Text style={[styles.buttonText, { color: theme.COLORS.text.primary }]}>
+                  Sign In
+                </Text>
               )}
             </TouchableOpacity>
 
@@ -135,7 +141,9 @@ export default function LoginScreen() {
               style={styles.forgotPassword}
               onPress={() => router.push('/screens/ForgotPassword')}
             >
-              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+              <Text style={[styles.forgotPasswordText, { color: theme.COLORS.primary.main }]}>
+                Forgot Password?
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -147,7 +155,8 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.COLORS.background.default,
+    padding:0,
+    margin:0
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -165,19 +174,16 @@ const styles = StyleSheet.create({
     width: horizontalScale(80),
     height: horizontalScale(80),
     borderRadius: horizontalScale(40),
-    backgroundColor: `${theme.COLORS.primary.main}20`,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: verticalScale(16),
   },
   title: {
-    color: theme.COLORS.text.primary,
     fontSize: fontScale(32),
-    ...theme.FONTS.bold,
+    fontWeight: '700',
     marginBottom: verticalScale(8),
   },
   subtitle: {
-    color: theme.COLORS.text.secondary,
     fontSize: fontScale(16),
   },
   form: {
@@ -186,14 +192,12 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.COLORS.background.paper,
     borderRadius: 8,
     paddingHorizontal: horizontalScale(16),
     marginBottom: verticalScale(16),
   },
   input: {
     flex: 1,
-    color: theme.COLORS.text.primary,
     fontSize: fontScale(16),
     paddingVertical: verticalScale(16),
     marginLeft: horizontalScale(12),
@@ -202,12 +206,10 @@ const styles = StyleSheet.create({
     padding: moderateScale(8),
   },
   errorText: {
-    color: theme.COLORS.error,
     fontSize: fontScale(14),
     marginBottom: verticalScale(16),
   },
   button: {
-    backgroundColor: theme.COLORS.primary.main,
     borderRadius: 8,
     paddingVertical: verticalScale(16),
     alignItems: 'center',
@@ -217,16 +219,13 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   buttonText: {
-    color: theme.COLORS.text.primary,
     fontSize: fontScale(16),
-    ...theme.FONTS.medium,
+    fontWeight: '500',
   },
   forgotPassword: {
     alignItems: 'center',
-    marginBottom: verticalScale(24),
   },
   forgotPasswordText: {
-    color: theme.COLORS.primary.main,
     fontSize: fontScale(14),
   },
 }); 
