@@ -65,35 +65,75 @@ const profileMenuItems: ProfileMenuItem[] = [
   },
 ];
 
-export const ProfileShimmer = () => (
-  <View style={styles.profileContainer}>
-    {/* Profile Header Shimmer */}
-    <View style={styles.profileHeader}>
-      <Shimmer width={60} height={60} borderRadius={30} style={{ marginRight: horizontalScale(12) }} />
-      <View>
-        <Shimmer width={120} height={20} style={{ marginBottom: verticalScale(4) }} />
-        <Shimmer width={80} height={16} />
-      </View>
-    </View>
+export const ProfileShimmer = () => {
+  const { isDarkMode } = useTheme();
+  const shimmerColor = isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
+  const shimmerHighlight = isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)';
 
-    {/* Profile Stats Shimmer */}
-    <View style={styles.profileStats}>
-      {[1, 2, 3].map((index) => (
-        <View key={index} style={styles.profileStat}>
-          <Shimmer width={60} height={16} style={{ marginBottom: verticalScale(4) }} />
-          <Shimmer width={40} height={24} />
-        </View>
-      ))}
-    </View>
+  return (
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
+      <LinearGradient
+        colors={isDarkMode ? ['#1C8D3A', '#165C27', '#0A3814'] : ['#E8F5E9', '#C8E6C9', '#A5D6A7']}
+        style={styles.gradientBackground}
+      >
+        <ScrollView style={styles.scrollView}>
+          {/* Header Shimmer */}
+          <View style={styles.header}>
+            <View style={[styles.circleContainer, { backgroundColor: shimmerColor }]} />
+          </View>
 
-    {/* Profile Details Shimmer */}
-    <View style={styles.profileDetails}>
-      <Shimmer width={'100%'} height={40} style={{ marginBottom: verticalScale(12) }} />
-      <Shimmer width={'80%'} height={40} style={{ marginBottom: verticalScale(12) }} />
-      <Shimmer width={'90%'} height={40} />
+          {/* Profile Information Section */}
+          <View style={[styles.section, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.9)' }]}>
+            <View style={styles.sectionHeader}>
+              <View style={[styles.iconContainer, { backgroundColor: shimmerColor }]} />
+              <View style={[styles.sectionTitleShimmer, { backgroundColor: shimmerColor }]} />
+            </View>
+            <View style={styles.profileInfo}>
+              <View style={styles.infoRow}>
+                <View style={[styles.labelShimmer, { backgroundColor: shimmerColor }]} />
+                <View style={[styles.valueShimmer, { backgroundColor: shimmerColor }]} />
+              </View>
+              <View style={styles.infoRow}>
+                <View style={[styles.labelShimmer, { backgroundColor: shimmerColor }]} />
+                <View style={[styles.valueShimmer, { backgroundColor: shimmerColor }]} />
+              </View>
+              <View style={styles.infoRow}>
+                <View style={[styles.labelShimmer, { backgroundColor: shimmerColor }]} />
+                <View style={[styles.valueShimmer, { backgroundColor: shimmerColor }]} />
+              </View>
+              <View style={styles.infoRow}>
+                <View style={[styles.labelShimmer, { backgroundColor: shimmerColor }]} />
+                <View style={[styles.valueShimmer, { backgroundColor: shimmerColor }]} />
+              </View>
+            </View>
+          </View>
+
+          {/* Menu Items Shimmer */}
+          <View style={styles.menuContainer}>
+            {[1, 2, 3, 4, 5].map((_, index) => (
+              <View key={index} style={[styles.menuItem, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.9)' }]}>
+                <View style={styles.menuItemLeft}>
+                  <View style={[styles.iconContainer, { backgroundColor: shimmerColor }]} />
+                  <View style={styles.menuItemText}>
+                    <View style={[styles.menuItemTitleShimmer, { backgroundColor: shimmerColor }]} />
+                    <View style={[styles.menuItemSubtitleShimmer, { backgroundColor: shimmerColor }]} />
+                  </View>
+                </View>
+                <View style={[styles.chevronShimmer, { backgroundColor: shimmerColor }]} />
+              </View>
+            ))}
+          </View>
+
+          {/* Logout Button Shimmer */}
+          <View style={[styles.logoutButton, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.9)' }]}>
+            <View style={[styles.logoutIconShimmer, { backgroundColor: shimmerColor }]} />
+            <View style={[styles.logoutTextShimmer, { backgroundColor: shimmerColor }]} />
+          </View>
+        </ScrollView>
+      </LinearGradient>
     </View>
-  </View>
-);
+  );
+};
 
 export default function ProfileScreen() {
   const { logout, accessToken } = useAuth();
@@ -398,5 +438,48 @@ const styles = StyleSheet.create({
   },
   profileDetails: {
     width: '100%',
+  },
+  sectionTitleShimmer: {
+    height: verticalScale(24),
+    width: horizontalScale(200),
+    borderRadius: 4,
+    marginLeft: horizontalScale(8),
+  },
+  labelShimmer: {
+    height: verticalScale(16),
+    width: horizontalScale(100),
+    borderRadius: 4,
+  },
+  valueShimmer: {
+    height: verticalScale(16),
+    width: horizontalScale(150),
+    borderRadius: 4,
+  },
+  menuItemTitleShimmer: {
+    height: verticalScale(20),
+    width: horizontalScale(200),
+    borderRadius: 4,
+    marginBottom: verticalScale(4),
+  },
+  menuItemSubtitleShimmer: {
+    height: verticalScale(16),
+    width: horizontalScale(150),
+    borderRadius: 4,
+  },
+  chevronShimmer: {
+    width: horizontalScale(24),
+    height: verticalScale(24),
+    borderRadius: 12,
+  },
+  logoutIconShimmer: {
+    width: horizontalScale(24),
+    height: verticalScale(24),
+    borderRadius: 12,
+    marginRight: horizontalScale(8),
+  },
+  logoutTextShimmer: {
+    height: verticalScale(20),
+    width: horizontalScale(80),
+    borderRadius: 4,
   },
 }); 
