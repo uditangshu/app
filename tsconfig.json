@@ -4,9 +4,7 @@
     "strict": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"]
     },
     "jsx": "react-native",
     "target": "esnext",
@@ -24,7 +22,6 @@
   "include": [
     "**/*.ts",
     "**/*.tsx",
-    "env.d.ts",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
   ],

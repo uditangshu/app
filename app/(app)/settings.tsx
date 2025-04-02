@@ -12,7 +12,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { horizontalScale, verticalScale, moderateScale, fontScale } from '../../utils/responsive';
-import { NotificationService } from '../../services/NotificationService';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface SettingItem {
@@ -35,14 +34,6 @@ export default function SettingsScreen() {
       type: 'toggle',
       value: isDarkMode,
       onToggle: toggleTheme,
-    },
-    {
-      icon: 'notifications-outline',
-      title: 'Push Notifications',
-      subtitle: 'Receive app notifications',
-      type: 'toggle',
-      value: true,
-      onToggle: () => {},
     },
     {
       icon: 'language-outline',
@@ -81,7 +72,6 @@ export default function SettingsScreen() {
     },
   ]);
 
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const { accessToken } = useAuth();
 
   const handleToggle = (index: number, value: boolean) => {
@@ -90,20 +80,6 @@ export default function SettingsScreen() {
     setSettings(newSettings);
     if (newSettings[index].onToggle) {
       newSettings[index].onToggle(value);
-    }
-  };
-
-  const handleNotificationToggle = async () => {
-    if (!accessToken) return;
-
-    const notificationService = NotificationService.getInstance();
-    
-    if (!notificationsEnabled) {
-      await notificationService.registerForPushNotifications(accessToken);
-      setNotificationsEnabled(true);
-    } else {
-      await notificationService.unregisterDevice(accessToken);
-      setNotificationsEnabled(false);
     }
   };
 

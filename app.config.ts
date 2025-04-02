@@ -3,7 +3,7 @@ import { ExpoConfig, ConfigContext } from 'expo/config';
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'Employee Portal',
-  slug: 'employee-portal',
+  slug: 'employee-app',
   version: '1.0.0',
   orientation: 'portrait',
   icon: './assets/icon.png',
@@ -13,45 +13,29 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     resizeMode: 'contain',
     backgroundColor: '#000000'
   },
-  updates: {
-    fallbackToCacheTimeout: 0
-  },
   assetBundlePatterns: [
     '**/*'
   ],
   ios: {
     supportsTablet: true,
-    bundleIdentifier: 'com.yourcompany.employeeportal',
-    infoPlist: {
-      UIBackgroundModes: ['remote-notification']
-    }
+    bundleIdentifier: 'com.yourcompany.employeeportal'
   },
   android: {
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
       backgroundColor: '#000000'
     },
-    package: 'com.yourcompany.employeeportal',
-    googleServicesFile: './google-services.json',
-    permissions: ['NOTIFICATIONS']
+    package: 'com.yourcompany.employeeportal'
   },
   web: {
     favicon: './assets/favicon.png'
   },
   plugins: [
-    'expo-router',
-    [
-      'expo-notifications',
-      {
-        icon: './assets/notification-icon.png',
-        color: '#1C8D3A',
-        sounds: ['./assets/notification.wav']
-      }
-    ]
+    'expo-router'
   ],
   extra: {
     eas: {
-      projectId: "your-project-id"
+      projectId: "7d6c330a-c84a-47cc-94ce-d05214bdf571"
     }
   }
 }); 
