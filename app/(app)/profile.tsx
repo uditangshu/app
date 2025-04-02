@@ -6,9 +6,9 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  SafeAreaView,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -137,7 +137,10 @@ export default function ProfileScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.COLORS.background.default }]}>
+      <SafeAreaView 
+        style={[styles.container, { backgroundColor: 'transparent' }]}
+        edges={['right', 'bottom', 'left']}
+      >
         <ScrollView style={styles.scrollView}>
           <ProfileShimmer />
         </ScrollView>
@@ -158,7 +161,10 @@ export default function ProfileScreen() {
     : ['#E8F5E9', '#C8E6C9', '#A5D6A7'];
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.COLORS.background.default }]}>
+    <SafeAreaView 
+      style={[styles.container, { backgroundColor: 'transparent' }]}
+      edges={['right', 'bottom', 'left']}
+    >
       <LinearGradient
         colors={gradientColors}
         style={styles.gradientBackground}
@@ -274,6 +280,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: horizontalScale(16),
     paddingTop: verticalScale(24),
+    marginTop: verticalScale(30),
   },
   circleContainer: {
     width: horizontalScale(120),

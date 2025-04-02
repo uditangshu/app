@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   Platform,
   ViewStyle,
   ActivityIndicator,
@@ -14,6 +13,7 @@ import {
   PanResponder,
   AppState,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
@@ -25,12 +25,12 @@ import NotificationsModal from '../modals/notifications';
 import Shimmer from '../components/Shimmer';
 import { useTheme } from '../../contexts/ThemeContext';
 
-interface EventItem {
-  id: string;
-  title: string;
-  date: string;
-  type: 'Meeting' | 'Deadline' | 'Training';
-}
+// interface EventItem {
+//   id: string;
+//   title: string;
+//   date: string;
+//   type: 'Meeting' | 'Deadline' | 'Training';
+// }
 
 interface ChatItem {
   chat_id: string;
@@ -107,11 +107,25 @@ interface EmployeeProfile {
   };
 }
 
-const events: EventItem[] = [
-  { id: '1', title: 'Team Meeting', date: '2023-03-25 10:00 AM', type: 'Meeting' },
-  { id: '2', title: 'Project Deadline', date: '2023-03-28', type: 'Deadline' },
-  { id: '3', title: 'Training Session', date: '2023-03-30 2:00 PM', type: 'Training' },
-];
+interface ScheduledSession {
+  session_id: string;
+  user_id: string;
+  chat_id: string;
+  status: string;
+  scheduled_at: string;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  notes: string;
+}
+
+// const events: EventItem[] = [
+//   { id: '1', title: 'Team Meeting', date: '2023-03-25 10:00 AM', type: 'Meeting' },
+//   { id: '2', title: 'Project Deadline', date: '2023-03-28', type: 'Deadline' },
+//   { id: '3', title: 'Training Session', date: '2023-03-30 2:00 PM', type: 'Training' },
+// ];
 
 export default function HomeScreen() {
   const { user } = useAuth();
@@ -132,6 +146,8 @@ export default function HomeScreen() {
   const [hasMoreNotifications, setHasMoreNotifications] = useState(true);
   const [profile, setProfile] = useState<EmployeeProfile | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [scheduledSessions, setScheduledSessions] = useState<ScheduledSession[]>([]);
+  const [loadingScheduledSessions, setLoadingScheduledSessions] = useState(false);
   const PAGE_SIZE = 3;
 
   const pan = useRef(new Animated.ValueXY()).current;
@@ -318,10 +334,36 @@ export default function HomeScreen() {
     }
   };
 
+  const fetchScheduledSessions = async () => {
+    if (!accessToken) return;
+    
+    try {
+      setLoadingScheduledSessions(true);
+      const response = await fetch(`${API_URL}/employee/scheduled-sessions`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch scheduled sessions');
+      }
+
+      const data = await response.json();
+      console.log('Scheduled sessions:', data);
+      setScheduledSessions(data);
+    } catch (error) {
+      console.error('Error fetching scheduled sessions:', error);
+    } finally {
+      setLoadingScheduledSessions(false);
+    }
+  };
+
   useEffect(() => {
     fetchChats(1);
     fetchNotifications(1, true);
     fetchProfile();
+    fetchScheduledSessions();
     
     const interval = setInterval(() => {
       fetchNotifications(1, true);
@@ -357,6 +399,12 @@ export default function HomeScreen() {
   };
 
   const showChat = (chatId?: string) => {
+    // If creating a new chat (no chatId), verify there are pending sessions
+    if (!chatId && !scheduledSessions.some(session => session.status === "pending")) {
+      // If no pending sessions, don't open chat
+      return;
+    }
+    
     if (chatId) {
       setSelectedChatId(chatId);
       setIsFromRecentChat(true);
@@ -421,7 +469,10 @@ export default function HomeScreen() {
     : ['#E8F5E9', '#C8E6C9', '#A5D6A7'];
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.COLORS.background.default }]}>
+    <SafeAreaView 
+      style={[styles.container, { backgroundColor: 'transparent' }]}
+      edges={['right', 'bottom', 'left']}
+    >
       <LinearGradient
         colors={gradientColors}
         style={styles.gradientBackground}
@@ -604,7 +655,7 @@ export default function HomeScreen() {
           <View style={[styles.section, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.9)' }]}>
             <View style={styles.sectionHeader}>
               <Ionicons name="chatbubbles-outline" size={24} color={isDarkMode ? 'white' : theme.COLORS.primary.main} />
-              <Text style={[styles.sectionTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>Recent Chats</Text>
+              <Text style={[styles.sectionTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>Recent Sessions</Text>
             </View>
             <Text style={[styles.sectionSubtitle, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>Your recent conversations</Text>
 
@@ -698,42 +749,54 @@ export default function HomeScreen() {
             )}
           </View>
 
-          {/* Chat Button */}
-          <TouchableOpacity 
-            style={[styles.chatButton, { backgroundColor: theme.COLORS.primary.main }]}
-            onPress={() => showChat()}
-          >
-            <Ionicons name="add" size={24} color={theme.COLORS.background.paper} />
-            <Text style={[styles.chatButtonText, { color: theme.COLORS.background.paper }]}>
-              New Chat
-            </Text>
-          </TouchableOpacity>
+          {/* Chat Button - Only show if there are pending scheduled sessions */}
+          {scheduledSessions.some(session => session.status === "pending") && (
+            <TouchableOpacity 
+              style={[styles.chatButton, { backgroundColor: theme.COLORS.primary.main }]}
+              onPress={() => showChat()}
+            >
+              <Ionicons name="add" size={24} color={theme.COLORS.background.paper} />
+              <Text style={[styles.chatButtonText, { color: theme.COLORS.background.paper }]}>
+                New Chat
+              </Text>
+            </TouchableOpacity>
+          )}
         </ScrollView>
 
         {/* Chat Modal */}
         {isChatVisible && (
           <Animated.View
-            style={[
-              styles.chatModal,
-              {
-                transform: [{ translateY: chatTranslateY }],
-                opacity: chatOpacity,
-                backgroundColor: theme.COLORS.background.paper,
-              },
-            ]}
-            {...panResponder.panHandlers}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 1000,
+            }}
           >
-            <View style={styles.chatHeader}>
-              <View style={styles.chatHandle} />
-              <TouchableOpacity onPress={dismissChat} style={styles.closeButton}>
-                <Ionicons name="close" size={24} color={theme.COLORS.text.primary} />
-              </TouchableOpacity>
-            </View>
-            <ChatScreen 
-              onClose={dismissChat} 
-              initialChatId={selectedChatId} 
-              isReadOnly={isFromRecentChat}
-            />
+            <Animated.View
+              style={[
+                styles.chatModal,
+                {
+                  transform: [{ translateY: chatTranslateY }],
+                  opacity: chatOpacity,
+                  backgroundColor: theme.COLORS.background.paper,
+                  height: '100%',
+                },
+              ]}
+              {...panResponder.panHandlers}
+            >
+              <View style={styles.chatHeader}>
+                <View style={styles.chatHandle} />
+              </View>
+              <ChatScreen 
+                onClose={dismissChat} 
+                initialChatId={selectedChatId} 
+                isReadOnly={isFromRecentChat}
+                scheduledSessions={scheduledSessions}
+              />
+            </Animated.View>
           </Animated.View>
         )}
 
@@ -753,6 +816,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: 'transparent',
   },
   gradientBackground: {
     flex: 1,
@@ -1017,11 +1081,6 @@ const styles = StyleSheet.create({
     backgroundColor: theme.COLORS.border.main,
     borderRadius: 2,
     marginBottom: verticalScale(8),
-  },
-  closeButton: {
-    position: 'absolute',
-    right: horizontalScale(16),
-    top: verticalScale(16),
   },
   updateGrid: {
     flexDirection: 'row',

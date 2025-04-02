@@ -5,10 +5,10 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
   Dimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -364,7 +364,10 @@ export default function StatisticsScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.COLORS.background.default }]}>
+    <SafeAreaView 
+      style={[styles.container, { backgroundColor: 'transparent' }]}
+      edges={['right', 'bottom', 'left']}
+    >
       <LinearGradient
         colors={gradientColors}
         style={styles.gradientBackground}
@@ -442,6 +445,7 @@ const styles = StyleSheet.create({
     padding: horizontalScale(16),
     paddingTop: verticalScale(24),
     paddingBottom: verticalScale(16),
+    marginTop: verticalScale(20),
   },
   headerTitle: {
     fontSize: fontScale(28),

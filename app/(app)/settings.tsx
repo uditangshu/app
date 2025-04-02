@@ -6,8 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -88,13 +88,16 @@ export default function SettingsScreen() {
     : ['#E8F5E9', '#C8E6C9', '#A5D6A7'];
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.COLORS.background.default }]}>
+    <SafeAreaView 
+      style={[styles.container, { backgroundColor: 'transparent' }]}
+      edges={['right', 'bottom', 'left']}
+    >
       <LinearGradient
         colors={gradientColors}
         style={styles.gradientBackground}
       >
         <ScrollView style={styles.scrollView}>
-          <View style={styles.section}>
+          <View style={[styles.section, { marginTop: verticalScale(20) }]}>
             <Text style={[styles.sectionTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>App Settings</Text>
             <Text style={[styles.sectionSubtitle, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>Customize your app experience</Text>
           </View>
