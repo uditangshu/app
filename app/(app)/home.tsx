@@ -757,7 +757,7 @@ export default function HomeScreen() {
             >
               <Ionicons name="add" size={24} color={theme.COLORS.background.paper} />
               <Text style={[styles.chatButtonText, { color: theme.COLORS.background.paper }]}>
-                New Chat
+                Pending Session
               </Text>
             </TouchableOpacity>
           )}
