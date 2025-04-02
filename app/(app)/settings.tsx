@@ -72,8 +72,6 @@ export default function SettingsScreen() {
     },
   ]);
 
-  const { accessToken } = useAuth();
-
   const handleToggle = (index: number, value: boolean) => {
     const newSettings = [...settings];
     newSettings[index] = { ...newSettings[index], value };
@@ -156,7 +154,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   section: {
-    padding: moderateScale(24),
+    paddingHorizontal: moderateScale(24),
+    paddingBottom: verticalScale(24),
   },
   sectionTitle: {
     fontSize: fontScale(28),

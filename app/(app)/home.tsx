@@ -829,7 +829,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: horizontalScale(16),
-    paddingTop: Platform.OS === 'android' ? verticalScale(40) : verticalScale(16),
     backgroundColor: 'transparent',
   },
   welcomeText: {
