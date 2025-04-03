@@ -27,6 +27,7 @@ interface Message {
   text: string;
   isUser: boolean;
   timestamp: Date;
+  isSystemMessage?: boolean;
 }
 
 interface ChatHistory {
@@ -72,11 +73,18 @@ interface ChatItem {
 interface ChatScreenProps {
   onClose: () => void;
   initialChatId?: string | null;
+  initialQuestion?: string;
   isReadOnly?: boolean;
   scheduledSessions?: ScheduledSession[];
 }
 
-export default function ChatScreen({ onClose, initialChatId, isReadOnly = false, scheduledSessions = [] }: ChatScreenProps) {
+export default function ChatScreen({ 
+  onClose, 
+  initialChatId, 
+  initialQuestion,
+  isReadOnly = false, 
+  scheduledSessions = [] 
+}: ChatScreenProps) {
   const { accessToken, refreshAccessToken, logout } = useAuth();
   const { theme, isDarkMode } = useTheme();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -177,6 +185,19 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false,
     fetchChatHistory();
     fetchScheduledSessions();
   }, [initialChatId, scheduledSessions]);
+
+  useEffect(() => {
+    if (initialQuestion && messages.length === 0) {
+      // Add the initial question as a system message
+      setMessages([{
+        id: Date.now().toString(),
+        text: initialQuestion,
+        isUser: false,
+        timestamp: new Date(),
+        isSystemMessage: true
+      }]);
+    }
+  }, [initialQuestion]);
 
   const handleAuthError = async (error: any) => {
     if (error.message === 'Failed to fetch scheduled sessions' || 
@@ -438,46 +459,27 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false,
 
   const renderMessage = ({ item }: { item: Message }) => (
     <View style={[
-      styles.messageContainer, 
-      item.isUser ? [
-        styles.userMessage,
-        { backgroundColor: '#1C8D3A' }
-      ] : [
-        styles.aiMessage,
-        { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.05)' }
-      ]
+      styles.messageContainer,
+      item.isUser ? [styles.userMessage, { backgroundColor: '#1C8D3A' }] : styles.aiMessage,
+      item.isSystemMessage && styles.systemMessage,
+      !item.isUser && { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
     ]}>
-      {!item.isUser && (
-        <View style={[styles.profileCircle, { 
-          backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.2)' : `${theme.COLORS.primary.main}20` 
-        }]}>
-          <Ionicons name="leaf-outline" size={20} color={theme.COLORS.primary.main} />
-        </View>
-      )}
-      <View style={[
-        styles.messageContent,
-        { backgroundColor: 'transparent' }
-      ]}>
+      <View style={styles.messageContent}>
         <Text style={[
-          styles.messageText,
-          { color: item.isUser ? 'white' : (isDarkMode ? 'white' : theme.COLORS.text.primary) }
+          styles.messageText, 
+          { 
+            color: item.isUser ? 'white' : (isDarkMode ? 'white' : theme.COLORS.text.primary),
+            fontStyle: item.isSystemMessage ? 'italic' : 'normal'
+          }
         ]}>
           {item.text}
         </Text>
-        <View style={styles.messageFooter}>
-          <Text style={[
-            styles.timestamp,
-            { color: item.isUser ? 'rgba(255,255,255,0.7)' : (isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)') }
-          ]}>
-            {item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </Text>
-          <Text style={[
-            styles.messageId,
-            { color: item.isUser ? 'rgba(255,255,255,0.7)' : (isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)') }
-          ]}>
-            ID: {item.id}
-          </Text>
-        </View>
+        <Text style={[
+          styles.timestamp,
+          { color: item.isUser ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.5)' }
+        ]}>
+          {item.timestamp.toLocaleTimeString()}
+        </Text>
       </View>
     </View>
   );
@@ -523,18 +525,20 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false,
       left: 0,
       right: 0,
       bottom: 0,
-    }]} edges={['top', 'bottom', 'left', 'right']}>
+      marginTop: 0,
+    }]} edges={['bottom', 'left', 'right']}>
       <View style={styles.mainContent}>
         <View style={[styles.header, {
-          backgroundColor: isDarkMode ? 'rgba(0,0,0,0.8)' : 'white',
+          backgroundColor: 'black',
           borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
-          paddingTop: moderateScale(16),
+          paddingTop: 0,
+          borderRadius: 0,
         }]}>
           <TouchableOpacity onPressIn={toggleSidebar} style={{...styles.menuButton}}>
-            <Ionicons name="menu" size={24} color={isDarkMode ? 'white' : theme.COLORS.text.primary} />
+            <Ionicons name="menu" size={24} color={'white'} />
           </TouchableOpacity>
-          <View style={{ flex: 1, alignItems: 'center', backgroundColor: 'black' }}>
-            <Text style={[styles.headerTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
+          <View style={{ flex: 1, alignItems: 'center' }}>
+            <Text style={[styles.headerTitle, { color: 'white' }]}>
               {selectedChatId ? `Session ID: ${selectedChatId}` : 'New Chat'}
             </Text>
           </View>
@@ -810,6 +814,8 @@ export default function ChatScreen({ onClose, initialChatId, isReadOnly = false,
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    marginTop: 0,
+    backgroundColor: theme.COLORS.background.paper,
   },
   mainContent: {
     flex: 1,
@@ -819,9 +825,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: moderateScale(16),
     paddingTop: moderateScale(8),
+    paddingBottom: moderateScale(8),
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(0,0,0,0.8)',
+    backgroundColor: 'black',
+    height: 50,
   },
   menuButton: {
     marginRight: horizontalScale(16),
@@ -916,6 +924,7 @@ const styles = StyleSheet.create({
   userMessage: {
     alignSelf: 'flex-end',
     borderRadius: 20,
+    backgroundColor: '#1C8D3A',
   },
   aiMessage: {
     alignSelf: 'flex-start',
@@ -1091,5 +1100,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.5)',
     zIndex: 999,
+  },
+  systemMessage: {
+    backgroundColor: 'rgba(28, 141, 58, 0.1)',
+    borderLeftWidth: 3,
+    borderLeftColor: '#1C8D3A',
   },
 }); 

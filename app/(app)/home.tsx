@@ -121,6 +121,12 @@ interface ScheduledSession {
   notes: string;
 }
 
+interface PendingChat {
+  chat_id: string;
+  question: string;
+  created_at: string;
+}
+
 // const events: EventItem[] = [
 //   { id: '1', title: 'Team Meeting', date: '2023-03-25 10:00 AM', type: 'Meeting' },
 //   { id: '2', title: 'Project Deadline', date: '2023-03-28', type: 'Deadline' },
@@ -137,7 +143,7 @@ export default function HomeScreen() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isChatVisible, setIsChatVisible] = useState(false);
-  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const [selectedChatId, setSelectedChatId] = useState<string | undefined>(undefined);
   const [isFromRecentChat, setIsFromRecentChat] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationModalVisible, setNotificationModalVisible] = useState(false);
@@ -148,32 +154,91 @@ export default function HomeScreen() {
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [scheduledSessions, setScheduledSessions] = useState<ScheduledSession[]>([]);
   const [loadingScheduledSessions, setLoadingScheduledSessions] = useState(false);
+  const [isChatModalVisible, setIsChatModalVisible] = useState(false);
+  const [selectedQuestion, setSelectedQuestion] = useState<string | undefined>(undefined);
   const PAGE_SIZE = 3;
 
-  const pan = useRef(new Animated.ValueXY()).current;
-  const chatHeight = useRef(new Animated.Value(0)).current;
-
+  // Single animation value for the chat modal
+  const chatAnimation = useRef(new Animated.Value(0)).current;
+  
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Only respond to vertical gestures to avoid accidental triggering
+        return Math.abs(gestureState.dy) > Math.abs(gestureState.dx) && gestureState.dy > 5;
+      },
       onPanResponderMove: (_, gestureState) => {
         if (gestureState.dy > 0) {
-          pan.setValue({ x: 0, y: gestureState.dy });
+          // Convert drag distance to a value between 0 and 1
+          const dragRatio = Math.min(1, gestureState.dy / Dimensions.get('window').height);
+          // Set animation value based on drag (1 - dragRatio to invert the scale)
+          chatAnimation.setValue(1 - dragRatio);
         }
       },
       onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dy > 100) {
+        // If dragged more than 20% of screen height or with velocity > 0.5, dismiss
+        if (gestureState.dy > Dimensions.get('window').height * 0.2 || gestureState.vy > 0.5) {
           dismissChat();
         } else {
-          Animated.spring(pan, {
-            toValue: { x: 0, y: 0 },
+          // Otherwise snap back to top with spring animation
+          Animated.spring(chatAnimation, {
+            toValue: 1,
             useNativeDriver: false,
+            tension: 100,
+            friction: 12, 
           }).start();
         }
       },
     })
   ).current;
+
+  const initiateChat = async () => {
+    if (!accessToken || loading) return;
+
+    setLoading(true);
+    try {
+      // Find a pending session to use
+      const pendingSession = scheduledSessions.find(
+        session => session.status === 'pending'
+      );
+
+      if (!pendingSession) {
+        console.error('No pending sessions available');
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/llm/chat/initiate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          session_id: pendingSession.session_id,
+          chat_id: pendingSession.chat_id
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to initiate chat');
+      }
+
+      const data = await response.json();
+      console.log('Chat initiated:', data);
+      
+      // If successful, set the new chat ID
+      if (data && data.chat_id) {
+        setSelectedChatId(data.chat_id);
+        // Also refresh chat history
+        fetchChats(1);
+      }
+    } catch (error) {
+      console.error('Error initiating chat:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchChats = async (pageNum: number, isLoadMore = false) => {
     try {
@@ -409,38 +474,47 @@ export default function HomeScreen() {
       setSelectedChatId(chatId);
       setIsFromRecentChat(true);
     } else {
-      setSelectedChatId(null);
+      setSelectedChatId(undefined);
       setIsFromRecentChat(false);
     }
+    
+    // Make the chat visible
     setIsChatVisible(true);
     
-    Animated.spring(chatHeight, {
+    // Animate from 0 to 1
+    Animated.spring(chatAnimation, {
       toValue: 1,
       useNativeDriver: false,
+      tension: 80,
+      friction: 12,
     }).start();
   };
 
   const dismissChat = () => {
-    Animated.timing(chatHeight, {
+    // Animate from 1 to 0
+    Animated.spring(chatAnimation, {
       toValue: 0,
-      duration: 300,
       useNativeDriver: false,
+      tension: 100,
+      friction: 12,
     }).start(() => {
       setIsChatVisible(false);
-      setSelectedChatId(null);
+      setSelectedChatId(undefined);
       setIsFromRecentChat(false);
     });
   };
 
-  const chatTranslateY = pan.y.interpolate({
-    inputRange: [0, Dimensions.get('window').height],
-    outputRange: [0, Dimensions.get('window').height],
+  // Derive translateY and opacity from a single animation value
+  const chatTranslateY = chatAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [Dimensions.get('window').height, 0],
     extrapolate: 'clamp',
   });
 
-  const chatOpacity = chatHeight.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
+  const chatOpacity = chatAnimation.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0, 0.7, 1],
+    extrapolate: 'clamp',
   });
 
   const unreadCount = notifications.filter(n => n.status === 'unread').length;
@@ -753,9 +827,13 @@ export default function HomeScreen() {
           {scheduledSessions.some(session => session.status === "pending") && (
             <TouchableOpacity 
               style={[styles.chatButton, { backgroundColor: theme.COLORS.primary.main }]}
-              onPress={() => showChat()}
+              onPress={async () => {
+                await initiateChat();
+                if (selectedChatId) {
+                  showChat(selectedChatId);
+                }
+              }}
             >
-              <Ionicons name="add" size={24} color={theme.COLORS.background.paper} />
               <Text style={[styles.chatButtonText, { color: theme.COLORS.background.paper }]}>
                 Pending Session
               </Text>
@@ -766,37 +844,24 @@ export default function HomeScreen() {
         {/* Chat Modal */}
         {isChatVisible && (
           <Animated.View
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              zIndex: 1000,
-            }}
+            style={[
+              styles.chatModal,
+              {
+                transform: [{ translateY: chatTranslateY }],
+                opacity: chatOpacity,
+              },
+            ]}
+            {...panResponder.panHandlers}
           >
-            <Animated.View
-              style={[
-                styles.chatModal,
-                {
-                  transform: [{ translateY: chatTranslateY }],
-                  opacity: chatOpacity,
-                  backgroundColor: theme.COLORS.background.paper,
-                  height: '100%',
-                },
-              ]}
-              {...panResponder.panHandlers}
-            >
-              <View style={styles.chatHeader}>
-                <View style={styles.chatHandle} />
-              </View>
-              <ChatScreen 
-                onClose={dismissChat} 
-                initialChatId={selectedChatId} 
-                isReadOnly={isFromRecentChat}
-                scheduledSessions={scheduledSessions}
-              />
-            </Animated.View>
+            <View style={styles.chatHandle}>
+              <View style={styles.handleBar} />
+            </View>
+            <ChatScreen
+              onClose={dismissChat}
+              initialChatId={selectedChatId}
+              initialQuestion={selectedQuestion}
+              scheduledSessions={scheduledSessions}
+            />
           </Animated.View>
         )}
 
@@ -808,6 +873,20 @@ export default function HomeScreen() {
           onLoadMore={handleLoadMoreNotifications}
           onNotificationPress={handleNotificationPress}
         />
+
+        {/* Chat Modal */}
+        {isChatModalVisible && (
+          <ChatScreen
+            onClose={() => {
+              setIsChatModalVisible(false);
+              setSelectedChatId(undefined);
+              setSelectedQuestion(undefined);
+            }}
+            initialChatId={selectedChatId}
+            initialQuestion={selectedQuestion}
+            scheduledSessions={scheduledSessions}
+          />
+        )}
       </LinearGradient>
     </SafeAreaView>
   );
@@ -878,21 +957,23 @@ const styles = StyleSheet.create({
     marginRight: horizontalScale(4),
   },
   section: {
-    padding: horizontalScale(16),
-    marginBottom: verticalScale(16),
-    backgroundColor: 'rgba(0,0,0,0.8)', // Darker background for sections
-    borderRadius: 12,
     marginHorizontal: horizontalScale(16),
+    paddingHorizontal: horizontalScale(16),
+    paddingVertical: verticalScale(16),
+    marginBottom: verticalScale(16),
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: verticalScale(8),
+    padding: moderateScale(16),
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
   },
   sectionTitle: {
-    color: 'white',
-    fontSize: fontScale(20),
-    fontWeight: 'bold',
+    fontSize: fontScale(18),
+    fontWeight: '600',
     marginLeft: horizontalScale(8),
   },
   sectionSubtitle: {
@@ -1073,13 +1154,21 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     overflow: 'hidden',
+    marginTop: 0,
+    zIndex: 1000,
+    elevation: 5,
   },
   chatHandle: {
+    width: '100%',
+    padding: verticalScale(8),
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  handleBar: {
     width: horizontalScale(40),
     height: verticalScale(4),
-    backgroundColor: theme.COLORS.border.main,
+    backgroundColor: 'rgba(150, 150, 150, 0.5)',
     borderRadius: 2,
-    marginBottom: verticalScale(8),
   },
   updateGrid: {
     flexDirection: 'row',
