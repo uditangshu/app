@@ -1,6 +1,7 @@
 import React, { ReactNode } from 'react';
 import { StyleSheet, ViewStyle } from 'react-native';
 import { SafeAreaView, Edge } from 'react-native-safe-area-context';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface SafeAreaWrapperProps {
   children: ReactNode;
@@ -13,9 +14,17 @@ export default function SafeAreaWrapper({
   style, 
   edges = ['right', 'bottom', 'left']
 }: SafeAreaWrapperProps) {
+  const { isDarkMode } = useTheme();
+  
   return (
     <SafeAreaView 
-      style={[styles.container, style]} 
+      style={[
+        { 
+          flex: 1,
+          backgroundColor: isDarkMode ? 'black' : '#F5F5F5'
+        }, 
+        style
+      ]} 
       edges={edges}
     >
       {children}
@@ -26,6 +35,6 @@ export default function SafeAreaWrapper({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: 'black',
   },
 }); 

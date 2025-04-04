@@ -5,7 +5,7 @@ import SafeAreaWrapper from '../../utils/SafeAreaWrapper';
 
 export default function AuthLayout() {
   return (
-    <SafeAreaWrapper style={{ backgroundColor: theme.COLORS.background.default }}>
+    <SafeAreaWrapper>
       <Stack
         screenOptions={{
           headerShown: false,

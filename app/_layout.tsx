@@ -12,9 +12,19 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ThemeProvider>
         <AuthProvider>
-          <InitialLayout />
+          <RootLayoutWithTheme />
         </AuthProvider>
       </ThemeProvider>
+    </SafeAreaProvider>
+  );
+}
+
+function RootLayoutWithTheme() {
+  const { isDarkMode } = useTheme();
+  
+  return (
+    <SafeAreaProvider style={{ backgroundColor: isDarkMode ? 'black' : '#F5F5F5' }}>
+      <InitialLayout />
     </SafeAreaProvider>
   );
 }
@@ -30,7 +40,7 @@ function InitialLayout() {
       <SafeAreaView 
         style={{ 
           flex: 1,
-          backgroundColor: 'transparent'
+          backgroundColor: isDarkMode ? 'black' : 'gray'
         }} 
         edges={['top']}
       >

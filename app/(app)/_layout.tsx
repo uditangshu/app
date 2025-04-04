@@ -12,7 +12,7 @@ export default function AppLayout() {
 
   if (isAuthLoading || isThemeLoading) {
     return (
-      <SafeAreaWrapper style={{ backgroundColor: theme.COLORS.background.default }}>
+      <SafeAreaWrapper>
         <View style={{ 
           flex: 1, 
           justifyContent: 'center', 
