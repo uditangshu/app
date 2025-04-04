@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -26,6 +27,17 @@ interface SettingItem {
 
 export default function SettingsScreen() {
   const { isDarkMode, toggleTheme, theme } = useTheme();
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setToastVisible(true);
+    setTimeout(() => {
+      setToastVisible(false);
+    }, 1000);
+  };
+
   const [settings, setSettings] = useState<SettingItem[]>([
     {
       icon: 'moon-outline',
@@ -40,35 +52,50 @@ export default function SettingsScreen() {
       title: 'Language',
       subtitle: 'Change app language',
       type: 'select',
-      onPress: () => {},
+      onPress: () => {
+        console.log('Feature coming soon: Language settings');
+        showToast('Language settings coming soon');
+      },
     },
     {
       icon: 'cloud-download-outline',
       title: 'Data & Storage',
       subtitle: 'Manage app data and storage',
       type: 'action',
-      onPress: () => {},
+      onPress: () => {
+        console.log('Feature coming soon: Data & Storage settings');
+        showToast('Data & Storage settings coming soon');
+      },
     },
     {
       icon: 'shield-checkmark-outline',
       title: 'Privacy',
       subtitle: 'Privacy settings and permissions',
       type: 'action',
-      onPress: () => {},
+      onPress: () => {
+        console.log('Feature coming soon: Privacy settings');
+        showToast('Privacy settings coming soon');
+      },
     },
     {
       icon: 'help-circle-outline',
       title: 'Help & Support',
       subtitle: 'Get help and contact support',
       type: 'action',
-      onPress: () => {},
+      onPress: () => {
+        console.log('Feature coming soon: Help & Support');
+        showToast('Help & Support coming soon');
+      },
     },
     {
       icon: 'information-circle-outline',
       title: 'About',
       subtitle: 'App version and information',
       type: 'action',
-      onPress: () => {},
+      onPress: () => {
+        console.log('Feature coming soon: About information');
+        showToast('About information coming soon');
+      },
     },
   ]);
 
@@ -105,7 +132,13 @@ export default function SettingsScreen() {
               <TouchableOpacity
                 key={index}
                 style={[styles.menuItem, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.9)' }]}
-                onPress={() => item.type !== 'toggle' && item.onPress?.()}
+                onPress={() => {
+                  if (item.type === 'toggle') {
+                    handleToggle(index, !item.value);
+                  } else if (item.onPress) {
+                    item.onPress();
+                  }
+                }}
               >
                 <View style={styles.menuItemLeft}>
                   <View style={[styles.iconContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.1)' : `${theme.COLORS.primary.main}20` }]}>
@@ -124,6 +157,7 @@ export default function SettingsScreen() {
                     onValueChange={(value) => handleToggle(index, value)}
                     trackColor={{ false: isDarkMode ? 'rgba(255,255,255,0.2)' : theme.COLORS.text.secondary, true: theme.COLORS.primary.main }}
                     thumbColor={isDarkMode ? 'white' : theme.COLORS.background.paper}
+                    onTouchStart={(e) => e.stopPropagation()}
                   />
                 )}
                 {item.type !== 'toggle' && (
@@ -138,6 +172,22 @@ export default function SettingsScreen() {
             <Text style={[styles.copyrightText, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>© 2024 Your Company. All rights reserved.</Text>
           </View>
         </ScrollView>
+
+        {toastVisible && (
+          <View style={[styles.toast, { 
+            backgroundColor: isDarkMode ? 'rgba(10,10,10,0.9)' : 'rgba(255,255,255,0.95)',
+            borderColor: isDarkMode ? 'rgba(50,50,50,0.5)' : 'rgba(230,230,230,0.8)',
+          }]}>
+            <Ionicons 
+              name="time-outline" 
+              size={18} 
+              color={isDarkMode ? '#1C8D3A' : theme.COLORS.primary.main} 
+            />
+            <Text style={[styles.toastText, { 
+              color: isDarkMode ? 'white' : '#333',
+            }]}>{toastMessage}</Text>
+          </View>
+        )}
       </LinearGradient>
     </SafeAreaView>
   );
@@ -214,5 +264,28 @@ const styles = StyleSheet.create({
   copyrightText: {
     fontSize: fontScale(12),
     fontWeight: "400",
+  },
+  toast: {
+    position: 'absolute',
+    bottom: verticalScale(20),
+    alignSelf: 'center',
+    width: '70%',
+    paddingVertical: moderateScale(12),
+    paddingHorizontal: moderateScale(16),
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+    borderWidth: 1,
+  },
+  toastText: {
+    fontSize: fontScale(14),
+    fontWeight: '500',
+    marginLeft: horizontalScale(8),
   },
 }); 

@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -140,6 +141,16 @@ export default function ProfileScreen() {
   const { theme, isDarkMode } = useTheme();
   const [profile, setProfile] = useState<EmployeeProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setToastVisible(true);
+    setTimeout(() => {
+      setToastVisible(false);
+    }, 1000);
+  };
 
   const fetchProfile = async () => {
     try {
@@ -173,6 +184,11 @@ export default function ProfileScreen() {
     } catch (error) {
       console.error('Error during logout:', error);
     }
+  };
+
+  const handleMenuItemPress = (title: string) => {
+    console.log(`Feature coming soon: ${title}`);
+    showToast(`${title} coming soon`);
   };
 
   if (loading) {
@@ -259,7 +275,7 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 key={index}
                 style={[styles.menuItem, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.9)' }]}
-                onPress={item.onPress}
+                onPress={() => handleMenuItemPress(item.title)}
               >
                 <View style={styles.menuItemLeft}>
                   <View style={[styles.iconContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.1)' : `${theme.COLORS.primary.main}10` }]}>
@@ -288,6 +304,22 @@ export default function ProfileScreen() {
             <Text style={[styles.logoutText, { color: theme.COLORS.error }]}>Logout</Text>
           </TouchableOpacity>
         </ScrollView>
+
+        {toastVisible && (
+          <View style={[styles.toast, { 
+            backgroundColor: isDarkMode ? 'rgba(10,10,10,0.9)' : 'rgba(255,255,255,0.95)',
+            borderColor: isDarkMode ? 'rgba(50,50,50,0.5)' : 'rgba(230,230,230,0.8)',
+          }]}>
+            <Ionicons 
+              name="time-outline" 
+              size={18} 
+              color={isDarkMode ? '#1C8D3A' : theme.COLORS.primary.main} 
+            />
+            <Text style={[styles.toastText, { 
+              color: isDarkMode ? 'white' : '#333',
+            }]}>{toastMessage}</Text>
+          </View>
+        )}
       </LinearGradient>
     </SafeAreaView>
   );
@@ -481,5 +513,28 @@ const styles = StyleSheet.create({
     height: verticalScale(20),
     width: horizontalScale(80),
     borderRadius: 4,
+  },
+  toast: {
+    position: 'absolute',
+    bottom: verticalScale(20),
+    alignSelf: 'center',
+    width: '70%',
+    paddingVertical: moderateScale(12),
+    paddingHorizontal: moderateScale(16),
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+    borderWidth: 1,
+  },
+  toastText: {
+    fontSize: fontScale(14),
+    fontWeight: '500',
+    marginLeft: horizontalScale(8),
   },
 }); 
