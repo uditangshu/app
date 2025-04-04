@@ -288,36 +288,45 @@ export default function HomeScreen() {
     }
   };
 
-  const fetchNotifications = async (page = 1, isRefresh = false) => {
-    if (!accessToken || (notificationsLoading && !isRefresh)) return;
-    
+  const fetchNotifications = async (pageNum: number, isLoadMore = false) => {
     try {
-      setNotificationsLoading(true);
+      if (isLoadMore) {
+        setNotificationsLoading(true);
+      }
+
       const response = await fetch(
-        `${API_URL}/employee/ping?page=${page}&limit=10`,
+        `${API_URL}/employee/ping?page=${pageNum}&limit=10`,
         {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
+            'Content-Type': 'application/json'
           },
         }
       );
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch notifications');
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Sort notifications by created_at date (newest first)
+        const sortedNotifications = data.notifications.sort((a: Notification, b: Notification) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        
+        if (isLoadMore) {
+          setNotifications(prev => {
+            const combined = [...prev, ...sortedNotifications];
+            // Sort combined list and remove duplicates
+            return Array.from(new Map(combined.map(item => [item.id, item])).values())
+              .sort((a: Notification, b: Notification) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          });
+        } else {
+          // For initial load or refresh, just set the sorted list
+          setNotifications(sortedNotifications);
+        }
+        
+        setHasMoreNotifications(data.notifications.length === 10);
+        setNotificationsPage(pageNum);
       }
-
-      const data = await response.json();
-      const newNotifications = data.notifications || [];
-      
-      // If it's a refresh or first page, replace the notifications
-      // Otherwise, append new notifications
-      setNotifications(prev => 
-        isRefresh || page === 1 ? newNotifications : [...prev, ...newNotifications]
-      );
-      
-      setHasMoreNotifications(newNotifications.length === 10);
-      setNotificationsPage(page);
     } catch (error) {
       console.error('Error fetching notifications:', error);
     } finally {
