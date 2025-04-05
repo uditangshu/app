@@ -1,16 +1,33 @@
 import React, { useEffect } from 'react';
 import { View, Animated, StyleSheet, DimensionValue, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface ShimmerProps {
   width: DimensionValue;
   height: number;
   borderRadius?: number;
   style?: ViewStyle;
+  backgroundColor?: string;
+  highlightColor?: string;
 }
 
-const Shimmer: React.FC<ShimmerProps> = ({ width, height, borderRadius = 4, style }) => {
+const Shimmer: React.FC<ShimmerProps> = ({ 
+  width, 
+  height, 
+  borderRadius = 4, 
+  style,
+  backgroundColor,
+  highlightColor
+}) => {
+  const { isDarkMode } = useTheme();
   const animatedValue = new Animated.Value(0);
+
+  // Default colors based on theme
+  const defaultBgColor = isDarkMode ? 'rgba(80, 80, 80, 0.2)' : 'rgba(230, 230, 230, 0.5)';
+  const defaultHighlightStart = isDarkMode ? 'rgba(255, 255, 255, 0)' : 'rgba(255, 255, 255, 0)';
+  const defaultHighlightMiddle = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.8)';
+  const defaultHighlightEnd = isDarkMode ? 'rgba(255, 255, 255, 0)' : 'rgba(255, 255, 255, 0)';
 
   useEffect(() => {
     Animated.loop(
@@ -42,7 +59,7 @@ const Shimmer: React.FC<ShimmerProps> = ({ width, height, borderRadius = 4, styl
           width,
           height,
           borderRadius,
-          backgroundColor: 'rgba(255, 255, 255, 0.05)',
+          backgroundColor: backgroundColor || defaultBgColor,
         } as ViewStyle,
         style,
       ]}
@@ -57,9 +74,9 @@ const Shimmer: React.FC<ShimmerProps> = ({ width, height, borderRadius = 4, styl
       >
         <LinearGradient
           colors={[
-            'rgba(255, 255, 255, 0)',
-            'rgba(255, 255, 255, 0.1)',
-            'rgba(255, 255, 255, 0)',
+            defaultHighlightStart,
+            highlightColor || defaultHighlightMiddle,
+            defaultHighlightEnd,
           ]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}

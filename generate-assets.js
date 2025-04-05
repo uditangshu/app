@@ -12,7 +12,7 @@ function createPlaceholderImage(width, height, filename, text) {
     const ctx = canvas.getContext('2d');
 
     // Fill background
-    ctx.fillStyle = '#1C8D3A';
+    ctx.fillStyle = '#2C5EE6';
     ctx.fillRect(0, 0, width, height);
 
     // Add text
@@ -29,6 +29,6 @@ function createPlaceholderImage(width, height, filename, text) {
 
 // Generate all required images
 createPlaceholderImage(1024, 1024, 'icon.png', 'Icon');
-createPlaceholderImage(1242, 2436, 'splash.png', 'Splash');
-createPlaceholderImage(1024, 1024, 'adaptive-icon.png', 'Adaptive');
+createPlaceholderImage(1242, 2436, 'splash.png', 'Deloitte');
+createPlaceholderImage(1024, 1024, 'adaptive-icon.png', 'Deloitte');
 createPlaceholderImage(32, 32, 'favicon.png', 'F'); 

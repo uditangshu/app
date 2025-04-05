@@ -108,12 +108,12 @@ interface Theme {
 export const theme: Theme = {
   COLORS: {
     primary: {
-      main: '#86BC25', // Deloitte Green
-      light: '#A3D14D',
-      dark: '#6B9B1E',
+      main: '#2C5EE6', // New Blue primary color
+      light: '#4B7BFF',
+      dark: '#1A3A99',
     },
     secondary: {
-      main: '#2C5282', // Deloitte Blue
+      main: '#2C5282', // Secondary blue
       light: '#4299E1',
       dark: '#2B6CB0',
     },
@@ -209,9 +209,9 @@ export const theme: Theme = {
 export const lightTheme = {
   COLORS: {
     primary: {
-      main: '#1C8D3A',
-      light: '#4DA3FF',
-      dark: '#165C27',
+      main: '#2C5EE6', // Blue for light theme
+      light: '#4B7BFF',
+      dark: '#1A3A99',
     },
     background: {
       main: '#FFFFFF',
@@ -249,9 +249,9 @@ export const lightTheme = {
 export const darkTheme = {
   COLORS: {
     primary: {
-      main: '#1C8D3A',
-      light: '#4DA3FF',
-      dark: '#165C27',
+      main: '#4B7BFF', // Brighter blue for dark theme
+      light: '#6E9CFF',
+      dark: '#2C5EE6',
     },
     background: {
       main: '#000000',

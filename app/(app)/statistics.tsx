@@ -123,7 +123,7 @@ export const StatisticsShimmer = () => {
             <View style={styles.activityStats}>
               {[1, 2, 3].map((statIndex) => (
                 <View key={`stat-${statIndex}`} style={styles.activityStat}>
-                  <View style={[styles.iconContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.1)' : `${theme.COLORS.primary.main}20` }]}>
+                  <View style={[styles.iconContainer, { backgroundColor: isDarkMode ? 'rgba(44, 94, 230, 0.1)' : `${theme.COLORS.primary.main}20` }]}>
                     <Shimmer width={20} height={20} borderRadius={10} />
                   </View>
                   <Shimmer 
@@ -153,7 +153,7 @@ export const StatisticsShimmer = () => {
           <View key={`review-shimmer-${index}`} style={cardStyle}>
             <View style={styles.reviewHeader}>
               <Shimmer width={140} height={20} />
-              <View style={[styles.ratingContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.2)' : `${theme.COLORS.primary.main}30` }]}>
+              <View style={[styles.ratingContainer, { backgroundColor: isDarkMode ? 'rgba(44, 94, 230, 0.2)' : `${theme.COLORS.primary.main}30` }]}>
                 <Shimmer width={40} height={20} />
               </View>
             </View>
@@ -162,7 +162,7 @@ export const StatisticsShimmer = () => {
               height={60} 
               style={{ marginTop: verticalScale(8) }}
             />
-            <View style={[styles.promotionBadge, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.2)' : `${theme.COLORS.primary.main}30` }]}>
+            <View style={[styles.promotionBadge, { backgroundColor: isDarkMode ? 'rgba(44, 94, 230, 0.2)' : `${theme.COLORS.primary.main}30` }]}>
               <Shimmer width={120} height={20} />
             </View>
           </View>
@@ -230,12 +230,12 @@ export default function StatisticsScreen() {
   }, []);
 
   const gradientColors = isDarkMode 
-    ? ['#1C8D3A', '#165C27', '#0A3814']
-    : ['#E8F5E9', '#C8E6C9', '#A5D6A7'];
+    ? ['#2C5EE6', '#1A3A99', '#0A1E4D']
+    : ['#E8F1FF', '#C8E1FF', '#A5D1FF'];
 
   const renderStatCard = (title: string, value: string | number, icon: string, subtitle?: string) => (
     <View style={[styles.statCard, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(255, 255, 255, 0.8)' }]}>
-      <View style={[styles.iconContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.1)' : `${theme.COLORS.primary.main}20` }]}>
+      <View style={[styles.iconContainer, { backgroundColor: isDarkMode ? 'rgba(44, 94, 230, 0.1)' : `${theme.COLORS.primary.main}20` }]}>
         <Ionicons name={icon as any} size={24} color={theme.COLORS.primary.main} />
       </View>
       <Text style={[styles.statTitle, { color: isDarkMode ? 'rgba(255, 255, 255, 0.7)' : theme.COLORS.text.secondary }]}>{title}</Text>
@@ -268,7 +268,7 @@ export default function StatisticsScreen() {
       </View>
       <View style={styles.activityStats}>
         <View style={styles.activityStat}>
-          <View style={[styles.iconContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.1)' : `${theme.COLORS.primary.main}20` }]}>
+          <View style={[styles.iconContainer, { backgroundColor: isDarkMode ? 'rgba(44, 94, 230, 0.1)' : `${theme.COLORS.primary.main}20` }]}>
             <Ionicons name="chatbubbles-outline" size={20} color={theme.COLORS.primary.main} />
           </View>
           <Text style={[styles.activityValue, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
@@ -279,7 +279,7 @@ export default function StatisticsScreen() {
           </Text>
         </View>
         <View style={styles.activityStat}>
-          <View style={[styles.iconContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.1)' : `${theme.COLORS.primary.main}20` }]}>
+          <View style={[styles.iconContainer, { backgroundColor: isDarkMode ? 'rgba(44, 94, 230, 0.1)' : `${theme.COLORS.primary.main}20` }]}>
             <Ionicons name="mail-outline" size={20} color={theme.COLORS.primary.main} />
           </View>
           <Text style={[styles.activityValue, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
@@ -290,7 +290,7 @@ export default function StatisticsScreen() {
           </Text>
         </View>
         <View style={styles.activityStat}>
-          <View style={[styles.iconContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.1)' : `${theme.COLORS.primary.main}20` }]}>
+          <View style={[styles.iconContainer, { backgroundColor: isDarkMode ? 'rgba(44, 94, 230, 0.1)' : `${theme.COLORS.primary.main}20` }]}>
             <Ionicons name="people-outline" size={20} color={theme.COLORS.primary.main} />
           </View>
           <Text style={[styles.activityValue, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
@@ -311,12 +311,12 @@ export default function StatisticsScreen() {
         <Text style={[styles.sectionTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>Performance Review</Text>
       </View>
       {profile?.company_data.performance.map((review, index) => (
-        <View key={`performance-${review.Review_Period}-${index}`} style={[styles.reviewCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.8)' }]}>
+        <View key={`performance-${review.Review_Period}-${index}`} style={[styles.reviewCard, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.8)' }]}>
           <View style={styles.reviewHeader}>
             <Text style={[styles.reviewPeriod, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
               {review.Review_Period}
             </Text>
-            <View style={[styles.ratingContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.2)' : `${theme.COLORS.primary.main}30` }]}>
+            <View style={[styles.ratingContainer, { backgroundColor: isDarkMode ? 'rgba(44, 94, 230, 0.2)' : `${theme.COLORS.primary.main}30` }]}>
               <Text style={[styles.ratingText, { color: theme.COLORS.primary.main }]}>
                 {review.Performance_Rating}/5
               </Text>
@@ -326,7 +326,7 @@ export default function StatisticsScreen() {
             {review.Manager_Feedback}
           </Text>
           {review.Promotion_Consideration && (
-            <View style={[styles.promotionBadge, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.2)' : `${theme.COLORS.primary.main}30` }]}>
+            <View style={[styles.promotionBadge, { backgroundColor: isDarkMode ? 'rgba(44, 94, 230, 0.2)' : `${theme.COLORS.primary.main}30` }]}>
               <Ionicons name="trending-up" size={16} color={theme.COLORS.primary.main} />
               <Text style={[styles.promotionText, { color: theme.COLORS.primary.main }]}>
                 Promotion Consideration
@@ -345,13 +345,13 @@ export default function StatisticsScreen() {
         <Text style={[styles.sectionTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>Vibe Meter</Text>
       </View>
       {profile?.company_data.vibemeter.map((vibe, index) => (
-        <View key={`vibe-${vibe.Response_Date}-${index}`} style={[styles.vibeCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.8)' }]}>
+        <View key={`vibe-${vibe.Response_Date}-${index}`} style={[styles.vibeCard, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.8)' }]}>
           <Text style={[styles.vibeDate, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
             {new Date(vibe.Response_Date).toLocaleDateString()}
           </Text>
           <View style={styles.vibeScoreContainer}>
             <View style={[styles.vibeScore, { 
-              backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.2)' : `${theme.COLORS.primary.main}30`,
+              backgroundColor: isDarkMode ? 'rgba(44, 94, 230, 0.2)' : `${theme.COLORS.primary.main}30`,
               width: `${(vibe.Vibe_Score / 5) * 100}%`
             }]} />
           </View>
@@ -410,7 +410,7 @@ export default function StatisticsScreen() {
                   <Text style={[styles.sectionTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>Leave History</Text>
                 </View>
                 {profile?.company_data.leave.map((leave, index) => (
-                  <View key={`leave-${leave.Leave_Start_Date}-${index}`} style={[styles.leaveItem, { backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.8)' }]}>
+                  <View key={`leave-${leave.Leave_Start_Date}-${index}`} style={[styles.leaveItem, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.05)' : 'rgba(255, 255, 255, 0.8)' }]}>
                     <View style={styles.leaveHeader}>
                       <Text style={[styles.leaveType, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>{leave.Leave_Type}</Text>
                       <Text style={[styles.leaveDays, { color: isDarkMode ? 'rgba(255, 255, 255, 0.7)' : theme.COLORS.text.secondary }]}>

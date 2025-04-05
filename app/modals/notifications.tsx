@@ -129,7 +129,7 @@ export default function NotificationsModal({ visible, onClose, notifications, lo
                     { 
                       backgroundColor: isDarkMode ? '#2A2A2A' : 'white',
                       borderLeftWidth: notification.status === 'unread' ? 3 : 0,
-                      borderLeftColor: notification.status === 'unread' ? '#1C8D3A' : 'transparent',
+                      borderLeftColor: notification.status === 'unread' ? '#2C5EE6' : 'transparent',
                       shadowColor: '#000',
                       shadowOffset: { width: 0, height: 2 },
                       shadowOpacity: isDarkMode ? 0 : 0.1,
@@ -142,10 +142,10 @@ export default function NotificationsModal({ visible, onClose, notifications, lo
                   activeOpacity={0.7}
                 >
                   <View style={[styles.iconContainer, { 
-                    backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.15)' : 'rgba(28, 141, 58, 0.08)',
+                    backgroundColor: isDarkMode ? 'rgba(44, 94, 230, 0.15)' : 'rgba(44, 94, 230, 0.08)',
                     borderWidth: 0
                   }]}>
-                    <Ionicons name="notifications-outline" size={24} color="#1C8D3A" />
+                    <Ionicons name="notifications-outline" size={24} color="#2C5EE6" />
                     {notification.status === 'unread' && (
                       <View style={[styles.unreadDot, { 
                         backgroundColor: '#FF3B30',

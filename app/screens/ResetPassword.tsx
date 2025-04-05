@@ -100,7 +100,7 @@ export default function ResetPasswordScreen() {
           {/* Header */}
           <View style={styles.header}>
             <View style={[styles.logoContainer, { backgroundColor: `${theme.COLORS.primary.main}20` }]}>
-              <Ionicons name="lock-open-outline" size={40} color={theme.COLORS.primary.main} />
+              <Ionicons name="shield-outline" size={40} color={theme.COLORS.primary.main} />
             </View>
             <Text style={[styles.title, { color: theme.COLORS.text.primary }]}>Reset Password</Text>
             <Text style={[styles.subtitle, { color: theme.COLORS.text.secondary }]}>

@@ -136,7 +136,7 @@ export default function LoginScreen() {
           {/* Logo and Title */}
           <View style={styles.header}>
             <View style={[styles.logoContainer, { backgroundColor: `${theme.COLORS.primary.main}20` }]}>
-              <Ionicons name="leaf-outline" size={40} color={theme.COLORS.primary.main} />
+              <Ionicons name="cloud-outline" size={40} color={theme.COLORS.primary.main} />
             </View>
             <Text style={[styles.title, { color: theme.COLORS.text.primary }]}>Welcome Back</Text>
             <Text style={[styles.subtitle, { color: theme.COLORS.text.secondary }]}>

@@ -74,7 +74,7 @@ export const ProfileShimmer = () => {
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <LinearGradient
-        colors={isDarkMode ? ['#1C8D3A', '#165C27', '#0A3814'] : ['#E8F5E9', '#C8E6C9', '#A5D6A7']}
+        colors={isDarkMode ? ['#2C5EE6', '#1A3A99', '#0A1E4D'] : ['#E8F1FF', '#C8E1FF', '#A5D1FF']}
         style={styles.gradientBackground}
       >
         <ScrollView style={styles.scrollView}>
@@ -213,8 +213,8 @@ export default function ProfileScreen() {
   }
 
   const gradientColors = isDarkMode 
-    ? ['#1C8D3A', '#165C27', '#0A3814']
-    : ['#E8F5E9', '#C8E6C9', '#A5D6A7'];
+    ? ['#2C5EE6', '#1A3A99', '#0A1E4D']
+    : ['#E8F1FF', '#C8E1FF', '#A5D1FF'];
 
   return (
     <SafeAreaView 
@@ -278,7 +278,7 @@ export default function ProfileScreen() {
                 onPress={() => handleMenuItemPress(item.title)}
               >
                 <View style={styles.menuItemLeft}>
-                  <View style={[styles.iconContainer, { backgroundColor: isDarkMode ? 'rgba(28, 141, 58, 0.1)' : `${theme.COLORS.primary.main}10` }]}>
+                  <View style={[styles.iconContainer, { backgroundColor: isDarkMode ? 'rgba(44, 94, 230, 0.1)' : `${theme.COLORS.primary.main}10` }]}>
                     <Ionicons name={item.icon as any} size={24} color={theme.COLORS.primary.main} />
                   </View>
                   <View style={styles.menuItemText}>
@@ -313,7 +313,7 @@ export default function ProfileScreen() {
             <Ionicons 
               name="time-outline" 
               size={18} 
-              color={isDarkMode ? '#1C8D3A' : theme.COLORS.primary.main} 
+              color={isDarkMode ? '#2C5EE6' : theme.COLORS.primary.main} 
             />
             <Text style={[styles.toastText, { 
               color: isDarkMode ? 'white' : '#333',
