@@ -45,7 +45,7 @@ export default function SettingsScreen() {
       subtitle: 'Toggle dark/light theme',
       type: 'toggle',
       value: isDarkMode,
-      onToggle: toggleTheme,
+      onToggle: () => toggleTheme(),
     },
     {
       icon: 'language-outline',

@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Animated,
   ToastAndroid,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -31,6 +32,8 @@ interface Message {
   isSessionMarker?: boolean;
   sessionId?: string;
   sender?: string;
+  sessionStatus?: string;
+  chainStatus?: string;
 }
 
 interface ChatHistory {
@@ -110,6 +113,7 @@ export default function ChatScreen({
   const [chainMessages, setChainMessages] = useState<{[key: string]: Message[]}>({});
   const [allMessages, setAllMessages] = useState<Message[]>([]);
   const sessionRefs = useRef<{[key: string]: React.RefObject<View>}>({});
+  const [isTyping, setIsTyping] = useState(false);
 
   const toggleSidebar = () => {
     console.log('toggleSidebar', isSidebarOpen);
@@ -376,37 +380,53 @@ export default function ChatScreen({
       }
     } else {
       // Original code for non-chain chats
-      if (accessToken) {
-        try {
-          const response = await fetch(`${API_URL}/employee/scheduled-sessions`, {
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-            },
-          });
+    if (accessToken) {
+      try {
+        const response = await fetch(`${API_URL}/employee/scheduled-sessions`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        });
 
-          if (response.ok) {
-            const sessions = await response.json();
-            const matchingSession = sessions.find(
-              (session: ScheduledSession) => 
-                session.chat_id === chatId && 
-                session.status === 'pending'
-            );
-            
-            setActiveSession(matchingSession || null);
-          }
-        } catch (error) {
-          console.error('Error checking session for chat:', error);
-          setActiveSession(null);
+        if (response.ok) {
+          const sessions = await response.json();
+          const matchingSession = sessions.find(
+            (session: ScheduledSession) => 
+              session.chat_id === chatId && 
+              session.status === 'pending'
+          );
+          
+          setActiveSession(matchingSession || null);
         }
+      } catch (error) {
+        console.error('Error checking session for chat:', error);
+        setActiveSession(null);
       }
-      
-      await loadChatMessages(chatId);
+    }
+    
+    await loadChatMessages(chatId);
     }
   };
 
   const sendMessage = async () => {
-    // Only proceed if there's an active session with "pending" status
-    if (!activeSession || activeSession.status !== "pending" || !inputText.trim() || !accessToken) return;
+    // Only proceed if there's text and a selected chat
+    console.log('Sending message:', inputText.trim());
+    if (!inputText.trim() || !accessToken || !selectedChatId) {
+      if (!selectedChatId) {
+        // Show error if trying to send without a selected chat
+        const errorMessage: Message = {
+          id: Date.now().toString(),
+          text: 'Please select or start a conversation first.',
+          isUser: false,
+          timestamp: new Date(),
+          sender: 'system',
+        };
+        setMessages(prev => [...prev, errorMessage]);
+        scrollToBottom();
+      }
+      return;
+    }
+    console.log('Sending message:', inputText.trim());
 
     const newMessage: Message = {
       id: Date.now().toString(),
@@ -421,8 +441,17 @@ export default function ChatScreen({
     const currentText = inputText.trim();
     setInputText('');
     scrollToBottom();
+    
+    // Show typing indicator
+    setIsTyping(true);
 
     try {
+      console.log('Making API call to:', `${API_URL}/llm/chat/message`);
+      console.log('Request body:', JSON.stringify({
+        chatId: selectedChatId,
+        message: currentText
+      }, null, 2));
+      
       const response = await fetch(`${API_URL}/llm/chat/message`, {
         method: 'POST',
         headers: {
@@ -430,30 +459,46 @@ export default function ChatScreen({
           'Authorization': `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
-          message: currentText,
-          session_id: activeSession.session_id, // Always use the active session ID
-          chat_id: selectedChatId,
-          sender: "emp"
+          chatId: selectedChatId,
+          message: currentText
         }),
       });
 
+      console.log('API response status:', response.status);
+      
       if (!response.ok) {
-        throw new Error('Failed to get response from bot');
+        const errorText = await response.text();
+        console.error('API error response:', errorText);
+        throw new Error(`Failed to get response from bot: ${response.status} ${errorText}`);
       }
 
       const data = await response.json();
       console.log('Bot response:', data); // Debug log
       
+      // Hide typing indicator
+      setIsTyping(false);
+      
       const aiResponse: Message = {
         id: (Date.now() + 1).toString(),
-        text: data.response || 'Sorry, I could not process your request.',
+        text: data.message || 'Sorry, I could not process your request.',
         isUser: false,
         timestamp: new Date(),
         sender: 'bot',
+        sessionStatus: data.sessionStatus,
+        chainStatus: data.chainStatus
       };
 
       setMessages(prev => [...prev, aiResponse]);
       scrollToBottom();
+
+      // Check if session status has changed
+      if (data.sessionStatus && activeSession) {
+        const updatedSession = {
+          ...activeSession,
+          status: data.sessionStatus
+        };
+        setActiveSession(updatedSession);
+      }
 
       // Update chat history
       setChatHistory(prev => prev.map(chat => 
@@ -524,8 +569,8 @@ export default function ChatScreen({
           }
 
           // Format and add the session messages
-          const formattedMessages = data.messages.map((msg: any) => ({
-            id: `${session.session_id}-${msg.id || Date.now() + Math.random()}`,
+          const formattedMessages = data.messages.map((msg: any, index: number) => ({
+            id: `${session.session_id}-${msg.id || `${Date.now()}-${index}-${Math.random()}`}`,
             text: msg.text || '',
             isUser: msg.sender === "emp",
             timestamp: new Date(msg.timestamp || Date.now()),
@@ -544,7 +589,7 @@ export default function ChatScreen({
           //   const formattedDate = `${nextSessionDate.toLocaleDateString()} ${nextSessionDate.toLocaleTimeString()}`;
             
           //   const sessionMarker: Message = {
-          //     id: `session-end-${session.session_id}`,
+          //     id: `session-marker-${session.session_id}-${i}-${Date.now()}`,
           //     text: `New Session Starting: ${formattedDate}`,
           //     isUser: false,
           //     timestamp: nextSessionDate,
@@ -616,7 +661,7 @@ export default function ChatScreen({
       <View 
         ref={ref || undefined}
         style={[
-          styles.messageContainer,
+      styles.messageContainer,
           item.isSessionMarker && [
             styles.sessionMarker,
             { backgroundColor: isDarkMode ? 'rgba(44, 94, 230, 0.2)' : 'rgba(44, 94, 230, 0.15)' }
@@ -686,35 +731,46 @@ export default function ChatScreen({
             <View style={[
               styles.messageBubble,
               item.isUser ? styles.userBubble : 
-              item.sender === 'system' ? styles.systemBubble : 
+              item.sender === 'system' ? [
+                styles.systemBubble,
+                { backgroundColor: isDarkMode ? 'rgba(100, 100, 100, 0.7)' : 'rgba(220, 220, 220, 0.9)' }
+              ] : 
               item.sender && item.sender !== 'bot' && item.sender !== 'emp' ? 
-                { backgroundColor: isDarkMode ? 'rgba(60, 60, 60, 1)' : 'rgba(240, 240, 240, 1)', borderLeftWidth: 2, borderLeftColor: '#E74C3C' } : 
-                { backgroundColor: isDarkMode ? '#333333' : '#E5E5E5' },
+                { backgroundColor: isDarkMode ? 'rgba(80, 80, 80, 1)' : 'rgba(240, 240, 240, 1)', borderLeftWidth: 2, borderLeftColor: '#E74C3C' } : 
+                { backgroundColor: isDarkMode ? 'rgba(60, 60, 60, 1)' : '#E5E5E5' },
+              item.text.includes('error') || item.text.includes('Error') ? {
+                backgroundColor: isDarkMode ? 'rgba(120, 30, 30, 0.9)' : 'rgba(255, 235, 235, 1)',
+                borderLeftWidth: 3,
+                borderLeftColor: isDarkMode ? '#ff6666' : '#cc0000'
+              } : {}
             ]}>
-              <Text style={[
-                styles.messageText, 
-                { 
-                  color: item.isUser ? 'white' : (isDarkMode ? 'white' : '#333333'),
-                  fontStyle: item.isSystemMessage ? 'italic' : 'normal'
-                }
-              ]}>
-                {item.text}
-              </Text>
+        <Text style={[
+          styles.messageText, 
+          { 
+                  color: item.isUser ? 'white' : (isDarkMode ? 'rgba(255, 255, 255, 0.95)' : '#333333'),
+                  fontStyle: item.isSystemMessage ? 'italic' : 'normal',
+                  fontWeight: item.text.includes('error') || item.text.includes('Error') ? '500' : 'normal'
+          }
+        ]}>
+          {item.text}
+        </Text>
             </View>
-            <Text style={[
-              styles.timestamp,
+        <Text style={[
+          styles.timestamp,
               { 
-                color: item.isUser ? 'rgba(255,255,255,0.7)' : 'rgba(150,150,150,0.8)',
+                color: item.isUser ? 'rgba(255,255,255,0.7)' : isDarkMode ? 'rgba(180,180,180,0.8)' : 'rgba(120,120,120,0.8)',
                 alignSelf: item.isUser ? 'flex-end' : 'flex-start',
-                marginTop: 4
+                marginTop: 4,
+                paddingHorizontal: 4,
+                fontSize: fontScale(10),
               }
             ]}>
-              {item.timestamp.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false})}
-            </Text>
+              {item.timestamp.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', hour12: false})}
+        </Text>
           </>
         )}
-      </View>
-    );
+    </View>
+  );
   };
 
   const renderChatHistoryItem = ({ item }: { item: ChatItem }) => (
@@ -780,6 +836,46 @@ export default function ChatScreen({
     }
   }, [initialChatId, scheduledSessions, chainContext]);
 
+  // Add this function before the render method
+  const TypingIndicator = () => {
+    return (
+      <View style={[
+        styles.messageContainer,
+        { alignSelf: 'flex-start', maxWidth: '80%' }
+      ]}>
+        <Text style={{
+          fontSize: fontScale(12),
+          fontWeight: '500',
+          marginHorizontal: horizontalScale(8),
+          color: '#888',
+          alignSelf: 'flex-start',
+          marginBottom: 6,
+        }}>
+          Assistant
+        </Text>
+        <View style={[
+          styles.messageBubble,
+          { backgroundColor: isDarkMode ? 'rgba(60, 60, 60, 1)' : '#E5E5E5', minWidth: 70 }
+        ]}>
+          <View style={styles.typingContainer}>
+            {[0, 1, 2].map((i) => (
+              <View 
+                key={`dot-${i}`}
+                style={[
+                  styles.typingDot, 
+                  { 
+                    backgroundColor: isDarkMode ? '#aaa' : '#666',
+                    opacity: 0.4 + (i * 0.2) // Make dots progressively more visible
+                  }
+                ]} 
+              />
+            ))}
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   if (isLoading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: isDarkMode ? '#121A2E' : '#F5F5F5' }]}>
@@ -790,7 +886,7 @@ export default function ChatScreen({
 
   return (
     <SafeAreaView style={[styles.container, { 
-      backgroundColor: isDarkMode ? '#121A2E' : '#F5F5F5',
+      backgroundColor: isDarkMode ? '#0F1525' : '#F5F5F5',
       position: 'absolute',
       top: 0,
       left: 0,
@@ -808,6 +904,12 @@ export default function ChatScreen({
           justifyContent: 'space-between',
           alignItems: 'center',
           paddingHorizontal: moderateScale(12),
+          elevation: 4,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.3,
+          shadowRadius: 3,
+          zIndex: 10,
         }]}>
           <TouchableOpacity onPressIn={toggleSidebar} style={{padding: moderateScale(6)}}>
             <Ionicons name="menu" size={24} color={'white'} />
@@ -832,40 +934,28 @@ export default function ChatScreen({
               marginRight: horizontalScale(4),
             }]}>
               {selectedChatId ? 'Conversation' : 'New Chat'}
-            </Text>
+              </Text>
             <Ionicons name="chevron-down" size={16} color="rgba(255,255,255,0.5)" />
           </TouchableOpacity>
-        </View>
-
-        {activeSession && (
-          <View style={[styles.activeSessionContainer, { 
-            backgroundColor: isDarkMode ? 'rgba(44, 94, 230, 0.1)' : 'rgba(44, 94, 230, 0.05)'
-          }]}>
-            <View style={styles.sessionHeader}>
-              <Ionicons name="calendar-outline" size={20} color={theme.COLORS.primary.main} />
-              <Text style={[styles.sessionTitle, { color: theme.COLORS.primary.main }]}>
-                Active Session
-              </Text>
             </View>
-            <View style={styles.sessionDetails}>
-              <Text style={[styles.sessionId, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
-                ID: {activeSession.session_id}
-              </Text>
-              <Text style={[styles.sessionTime, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
-                {new Date(activeSession.scheduled_at).toLocaleString()}
-              </Text>
-              {activeSession.notes && (
-                <Text style={[styles.sessionNotes, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
-                  Notes: {activeSession.notes}
-                </Text>
-              )}
-            </View>
-          </View>
-        )}
 
+        <ScrollView 
+          contentContainerStyle={{ 
+            flexGrow: 1, 
+            paddingBottom: verticalScale(80) // Space for the input box
+          }}
+          ref={(scrollRef) => {
+            // @ts-ignore
+            flatListRef.current = scrollRef;
+          }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={true}
+          scrollEventThrottle={16}
+        >
+          <View style={styles.messagesContainer}>
         {!activeSession && !selectedChatId ? (
           <View style={[styles.noSessionContainer, { 
-            backgroundColor: isDarkMode ? '#121A2E' : '#F5F5F5' 
+                backgroundColor: isDarkMode ? '#0F1525' : '#F5F5F5' 
           }]}>
             <Ionicons name="chatbubbles-outline" size={48} color={theme.COLORS.text.secondary} />
             <Text style={[styles.noSessionTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
@@ -875,151 +965,73 @@ export default function ChatScreen({
               Select a chat from history or start a new conversation
             </Text>
           </View>
-        ) : selectedChatId && (!activeSession || activeSession.status !== "pending") ? (
-          <>
-            {isLoading ? (
-              <View style={[styles.loadingContainer, { backgroundColor: isDarkMode ? '#121A2E' : '#F5F5F5' }]}>
+            ) : isLoading ? (
+              <View style={[styles.loadingContainer, { backgroundColor: isDarkMode ? '#0F1525' : '#F5F5F5' }]}>
                 <ActivityIndicator size="large" color={theme.COLORS.primary.main} />
               </View>
             ) : (
-              <>
-                <FlatList
-                  ref={flatListRef}
-                  data={chainContext ? allMessages : messages}
-                  renderItem={renderMessage}
-                  keyExtractor={item => item.id}
-                  contentContainerStyle={[styles.messageList, {
-                    backgroundColor: isDarkMode ? '#121A2E' : '#F5F5F5',
-                    flexGrow: 1,
-                    paddingBottom: verticalScale(16)
-                  }]}
-                  onContentSizeChange={() => {
-                    // Only auto-scroll to bottom on non-chain view
-                    if (!chainContext) scrollToBottom();
-                  }}
-                  onLayout={() => {
-                    // Only auto-scroll to bottom on non-chain view
-                    if (!chainContext) scrollToBottom();
-                  }}
-                  ListEmptyComponent={() => (
+              <View style={styles.messageList}>
+                {(chainContext ? allMessages : messages).length === 0 ? (
                     <View style={styles.emptyContainer}>
                       <Text style={[styles.emptyText, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
-                        {chainContext ? 'No messages in this chain' : 'No messages yet. Start a conversation!'}
-                      </Text>
-                    </View>
-                  )}
-                  removeClippedSubviews={true}
-                  maxToRenderPerBatch={10}
-                  windowSize={21}
-                  initialNumToRender={10}
-                  showsVerticalScrollIndicator={true}
-                  scrollEventThrottle={16}
-                />
-              </>
-            )}
-          </>
-        ) : !activeSession || activeSession.status !== "pending" ? (
-          <View style={[styles.noSessionContainer, { 
-            backgroundColor: isDarkMode ? '#121A2E' : '#F5F5F5' 
-          }]}>
-            <Ionicons name="alert-circle-outline" size={48} color={theme.COLORS.error} />
-            <Text style={[styles.noSessionTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
-              No Active Session
-            </Text>
-            <Text style={[styles.noSessionText, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
-              You need a pending scheduled session to chat with the AI assistant.
-            </Text>
-            
-            {scheduledSessions && scheduledSessions.length > 0 ? (
-              <View style={styles.scheduledSessionsList}>
-                <Text style={[styles.scheduledSessionsTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
-                  Upcoming Sessions:
-                </Text>
-                {scheduledSessions
-                  .filter(session => session.status === 'pending')
-                  .map(session => (
-                    <View 
-                      key={session.session_id} 
-                      style={[styles.scheduledSessionItem, { 
-                        backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
-                        borderColor: theme.COLORS.primary.main
-                      }]}
-                    >
-                      <Text style={[styles.sessionId, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
-                        ID: {session.session_id}
-                      </Text>
-                      <Text style={[styles.sessionTime, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
-                        {new Date(session.scheduled_at).toLocaleString()}
-                      </Text>
-                      <Text style={[styles.sessionStatus, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
-                        Status: {session.status}
-                      </Text>
-                    </View>
-                  ))}
-              </View>
-            ) : (
-              <Text style={[styles.emptyText, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary, marginTop: verticalScale(16) }]}>
-                No pending sessions are available. Please check back later.
-              </Text>
-            )}
-          </View>
-        ) : (
-          <>
-            {isLoading ? (
-              <View style={[styles.loadingContainer, { backgroundColor: isDarkMode ? '#121A2E' : '#F5F5F5' }]}>
-                <ActivityIndicator size="large" color={theme.COLORS.primary.main} />
-              </View>
-            ) : (
-              <FlatList
-                ref={flatListRef}
-                data={messages}
-                renderItem={renderMessage}
-                keyExtractor={item => item.id}
-                contentContainerStyle={[styles.messageList, {
-                  backgroundColor: isDarkMode ? '#121A2E' : '#F5F5F5',
-                  flexGrow: 1,
-                  paddingBottom: verticalScale(16)
-                }]}
-                onContentSizeChange={scrollToBottom}
-                onLayout={scrollToBottom}
-                ListEmptyComponent={() => (
-                  <View style={styles.emptyContainer}>
-                    <Text style={[styles.emptyText, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
-                      No messages yet. Start a conversation!
-                    </Text>
-                  </View>
+                      {chainContext ? 'No messages in this chain' : 'No messages yet. Start a conversation!'}
+                                </Text>
+                        </View>
+                      ) : (
+                  <>
+                    {(chainContext ? allMessages : messages).map((item, index) => renderMessage({item, index}))}
+                    
+                    {/* Typing indicator */}
+                    {isTyping && (
+                      <TypingIndicator />
+                    )}
+                  </>
                 )}
-              />
+              </View>
             )}
-          </>
-        )}
+                    </View>
+        </ScrollView>
 
-        {(!isReadOnly && activeSession && activeSession.status === "pending") && (
+        {(!isReadOnly) && (
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.content}>
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.inputWrapper}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
             <View style={[styles.inputContainer, {
-              backgroundColor: isDarkMode ? 'rgba(20, 30, 60, 0.9)' : 'white',
-              borderTopColor: isDarkMode ? 'rgba(44, 94, 230, 0.2)' : 'rgba(0,0,0,0.1)'
+              backgroundColor: isDarkMode ? 'rgba(20, 30, 60, 0.95)' : 'white',
+              borderTopColor: isDarkMode ? 'rgba(44, 94, 230, 0.2)' : 'rgba(0,0,0,0.1)',
+              borderTopWidth: 1,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: -2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 3,
+              elevation: 5,
             }]}>
               <TextInput
                 style={[styles.input, {
-                  backgroundColor: isDarkMode ? 'rgba(30, 40, 70, 0.8)' : 'rgba(0,0,0,0.05)',
+                  backgroundColor: isDarkMode ? 'rgba(40, 50, 80, 0.8)' : 'rgba(0,0,0,0.05)',
                   color: isDarkMode ? 'white' : theme.COLORS.text.primary,
                   borderRadius: 20,
+                  borderWidth: 1,
+                  borderColor: isDarkMode ? 'rgba(60, 80, 120, 0.5)' : 'rgba(0,0,0,0.1)',
                 }]}
                 value={inputText}
                 onChangeText={setInputText}
                 placeholder="Type your message..."
-                placeholderTextColor={isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)'}
+                placeholderTextColor={isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)'}
                 multiline
               />
               <TouchableOpacity
                 style={[
                   styles.sendButton, 
                   { 
-                    backgroundColor: inputText.trim() ? '#2C5EE6' : (isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.05)'),
-                    opacity: !inputText.trim() ? 0.5 : 1
+                    backgroundColor: inputText.trim() ? '#2C5EE6' : (isDarkMode ? 'rgba(30,40,60,0.7)' : 'rgba(0,0,0,0.05)'),
+                    opacity: !inputText.trim() ? 0.5 : 1,
+                    elevation: 3,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 2,
                   }
                 ]}
                 onPress={sendMessage}
@@ -1027,7 +1039,7 @@ export default function ChatScreen({
                 <Ionicons
                   name="send"
                   size={24}
-                  color={inputText.trim() ? 'white' : (isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)')}
+                  color={inputText.trim() ? 'white' : (isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)')}
                 />
               </TouchableOpacity>
             </View>
@@ -1062,7 +1074,7 @@ export default function ChatScreen({
         <FlatList
           data={chainContext ? chainSessions : chatHistory}
           renderItem={renderChatHistoryItem}
-          keyExtractor={item => item.chat_id}
+          keyExtractor={item => chainContext && item.session_id ? `${item.chat_id}-${item.session_id}` : `chat-${item.chat_id}`}
           contentContainerStyle={styles.chatHistoryList}
           ListEmptyComponent={() => (
             <View style={styles.emptyContainer}>
@@ -1182,7 +1194,7 @@ const styles = StyleSheet.create({
   },
   messageList: {
     padding: moderateScale(16),
-    flexGrow: 1,
+    width: '100%',
   },
   messageContainer: {
     marginVertical: verticalScale(4),
@@ -1208,6 +1220,9 @@ const styles = StyleSheet.create({
     fontSize: fontScale(11),
     ...theme.FONTS.regular,
     marginHorizontal: horizontalScale(4),
+    marginTop: 4,
+    opacity: 0.8,
+    backgroundColor: 'transparent',
   },
   inputContainer: {
     flexDirection: 'row',
@@ -1372,7 +1387,8 @@ const styles = StyleSheet.create({
   systemBubble: {
     backgroundColor: 'rgba(100, 100, 100, 0.7)',
     borderLeftWidth: 3,
-    borderLeftColor: '#888',
+    borderLeftColor: '#ff6666',
+    borderRadius: 16,
   },
   sessionMarker: {
     alignSelf: 'center',
@@ -1418,5 +1434,32 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(44, 94, 230, 0.4)',
     marginVertical: verticalScale(16),
     width: '100%',
+  },
+  inputWrapper: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    width: '100%',
+    zIndex: 100,
+    backgroundColor: 'transparent',
+  },
+  
+  messagesContainer: {
+    flex: 1,
+    width: '100%',
+  },
+  typingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+  },
+  typingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 2,
+    opacity: 0.6
   },
 }); 

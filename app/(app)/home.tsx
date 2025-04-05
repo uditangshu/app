@@ -1448,7 +1448,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginTop: 0,
     zIndex: 1000,
-    elevation: 5,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
   },
   chatHandle: {
     width: '100%',
