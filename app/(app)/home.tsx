@@ -1141,10 +1141,7 @@ export default function HomeScreen() {
               },
             ]}
           >
-            {/* Only keep the handle bar without the scroll indicator */}
-            <View style={styles.chatHandle} {...handlePanResponder.panHandlers}>
-              <View style={styles.handleBar} />
-            </View>
+          
             
             {/* Chat content without pan responder */}
             <View style={{flex: 1}}>

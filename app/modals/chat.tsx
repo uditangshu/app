@@ -915,30 +915,36 @@ export default function ChatScreen({
             <Ionicons name="menu" size={24} color={'white'} />
           </TouchableOpacity>
           
-          {/* Combined title and scroll area with subtle indicator */}
-          <TouchableOpacity 
-            style={{ 
-              flexGrow: 1,
-              flexDirection: 'row',
-              justifyContent: 'center', 
-              alignItems: 'center',
-              paddingVertical: moderateScale(8),
-              marginHorizontal: moderateScale(8),
-              borderRadius: 4,
-            }}
-            onPress={scrollToBottom}
-            activeOpacity={0.7}
-          >
+          {/* Title in center */}
+          <View style={{ 
+            flexGrow: 1,
+            justifyContent: 'center', 
+            alignItems: 'center',
+          }}>
             <Text style={[styles.headerTitle, { 
               color: 'white',
-              marginRight: horizontalScale(4),
             }]}>
               {selectedChatId ? 'Conversation' : 'New Chat'}
-              </Text>
-            <Ionicons name="chevron-down" size={16} color="rgba(255,255,255,0.5)" />
-          </TouchableOpacity>
-            </View>
+            </Text>
+          </View>
 
+          {/* Close button with down arrow - more subtle */}
+          <TouchableOpacity 
+            onPress={onClose} 
+            style={{
+              padding: moderateScale(8),
+              borderRadius: 18,
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              justifyContent: 'center',
+              alignItems: 'center',
+              width: 36,
+              height: 36,
+            }}
+          >
+            <Ionicons name="arrow-down" size={20} color={'rgba(255, 255, 255, 0.9)'} />
+          </TouchableOpacity>
+        </View>
+        
         <ScrollView 
           contentContainerStyle={{ 
             flexGrow: 1, 
