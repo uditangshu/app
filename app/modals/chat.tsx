@@ -22,6 +22,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import { API_URL } from '../../constants/api';
+import * as Speech from 'expo-speech';
 
 interface Message {
   id: string;
@@ -116,6 +117,7 @@ export default function ChatScreen({
   const [isTyping, setIsTyping] = useState(false);
   const [messageKey, setMessageKey] = useState(0);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [isDictating, setIsDictating] = useState(false);
   
   // Add a forceUpdate mechanism
   const [, forceUpdate] = useState({});
@@ -148,6 +150,40 @@ export default function ChatScreen({
   const handleSidebarPress = () => {
     if (isSidebarOpen) {
       setIsSidebarOpen(false);
+    }
+  };
+
+  const simulateDictation = async () => {
+    // Toggle dictation state
+    setIsDictating(prevState => !prevState);
+    
+    if (!isDictating) {
+      // Starting dictation
+      await Speech.speak("Listening...", {
+        language: 'en',
+        pitch: 1.0,
+        rate: 0.9
+      });
+      
+      // Simulate "waiting for silence" - wait 3 seconds
+      setTimeout(() => {
+        // Provide feedback that dictation is stopping due to silence
+        Speech.speak("Stopped listening", {
+          language: 'en',
+          pitch: 1.0,
+          rate: 0.9
+        });
+        
+        // Turn off dictation mode
+        setIsDictating(false);
+      }, 3000);
+    } else {
+      // User manually stopped dictation
+      await Speech.speak("Dictation canceled", {
+        language: 'en',
+        pitch: 1.0,
+        rate: 0.9
+      });
     }
   };
 
@@ -1087,26 +1123,7 @@ export default function ChatScreen({
         {/* Scroll to bottom button - only shown when scrolled up */}
         {showScrollToBottom && (
           <TouchableOpacity 
-            style={{
-              position: 'absolute',
-              left: '50%',
-              bottom: 100, // Position much higher above the input box
-              transform: [{ translateX: -25 }], // Half of width for centering
-              backgroundColor: '#2C5EE6',
-              width: 50,
-              height: 50,
-              borderRadius: 25,
-              justifyContent: 'center',
-              alignItems: 'center',
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 5 },
-              shadowOpacity: 0.4,
-              shadowRadius: 3,
-              elevation: 8,
-              zIndex: 100,
-              borderWidth: 2,
-              borderColor: 'rgba(255, 255, 255, 0.6)',
-            }}
+            style={styles.scrollToBottomButton}
             onPress={scrollToBottom}
             activeOpacity={0.7}
           >
@@ -1139,10 +1156,35 @@ export default function ChatScreen({
                 }]}
                 value={inputText}
                 onChangeText={setInputText}
-                placeholder="Type your message..."
+                placeholder={isDictating ? "Listening..." : "Type your message..."}
                 placeholderTextColor={isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)'}
                 multiline
               />
+              
+              {/* Microphone Button */}
+              <TouchableOpacity
+                style={[
+                  styles.micButton, 
+                  { 
+                    backgroundColor: isDictating ? 
+                      (isDarkMode ? 'rgba(255, 80, 80, 0.8)' : '#ff5050') : 
+                      (isDarkMode ? 'rgba(80, 100, 140, 0.8)' : 'rgba(44, 94, 230, 0.7)'),
+                    marginRight: 8,
+                    elevation: 3,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 2,
+                  }
+                ]}
+                onPress={simulateDictation}>
+                <Ionicons
+                  name={isDictating ? "mic" : "mic-outline"}
+                  size={24}
+                  color="white"
+                />
+              </TouchableOpacity>
+              
               <TouchableOpacity
                 style={[
                   styles.sendButton, 
@@ -1588,7 +1630,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: '50%',
     bottom: 100,
-    transform: [{ translateX: -25 }], // Half of width for centering
+    transform: [{ translateX: -25 }],
     backgroundColor: '#2C5EE6',
     width: 50,
     height: 50,
@@ -1600,7 +1642,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 3,
     elevation: 8,
+    zIndex: 100,
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.6)',
+  },
+  micButton: {
+    width: horizontalScale(40),
+    height: verticalScale(40),
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 }); 
