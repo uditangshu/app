@@ -106,7 +106,7 @@ export default function ChatScreen({
   const [selectedChatId, setSelectedChatId] = useState<string | null>(initialChatId || null);
   const [chatHistory, setChatHistory] = useState<ChatItem[]>([]);
   const [isFromRecentChat, setIsFromRecentChat] = useState(false);
-  const flatListRef = useRef<FlatList>(null);
+  const flatListRef = useRef<any>(null);
   const sidebarRef = useRef<View>(null);
   const router = useRouter();
   const [chainSessions, setChainSessions] = useState<any[]>([]);
@@ -114,6 +114,28 @@ export default function ChatScreen({
   const [allMessages, setAllMessages] = useState<Message[]>([]);
   const sessionRefs = useRef<{[key: string]: React.RefObject<View>}>({});
   const [isTyping, setIsTyping] = useState(false);
+  const [messageKey, setMessageKey] = useState(0);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  
+  // Add a forceUpdate mechanism
+  const [, forceUpdate] = useState({});
+  const messagesContainerRef = useRef<View>(null);
+  const messageElements = useRef<{[key: string]: React.ReactNode}>({});
+  
+  // Add a dedicated function to force rerender
+  const forceRerender = () => {
+    console.log("Forcing rerender");
+    setMessageKey(prev => prev + 1);
+    // Double force update using both mechanisms
+    forceUpdate({});
+    
+    // Use setTimeout to ensure state updates have propagated
+    setTimeout(() => {
+      console.log("Delayed force update");
+      setMessageKey(prev => prev + 1);
+      forceUpdate({});
+    }, 300);
+  };
 
   const toggleSidebar = () => {
     console.log('toggleSidebar', isSidebarOpen);
@@ -345,6 +367,9 @@ export default function ChatScreen({
 
       console.log('Formatted messages:', formattedMessages); // Debug log
       setMessages(formattedMessages);
+      
+      // Force update after setting messages
+      forceRerender();
       scrollToBottom();
 
       // Update unread count in chat history
@@ -422,24 +447,36 @@ export default function ChatScreen({
           sender: 'system',
         };
         setMessages(prev => [...prev, errorMessage]);
+        forceRerender();
         scrollToBottom();
       }
       return;
     }
-    console.log('Sending message:', inputText.trim());
 
+    const currentText = inputText.trim();
+    
+    // Create user message
     const newMessage: Message = {
       id: Date.now().toString(),
-      text: inputText.trim(),
+      text: currentText,
       isUser: true,
       timestamp: new Date(),
       sender: 'emp',
     };
 
-    // Immediately add the user's message to the UI
-    setMessages(prev => [...prev, newMessage]);
-    const currentText = inputText.trim();
+    // Immediately render the user message directly into the messageElements ref
+    messageElements.current[newMessage.id] = renderMessage({item: newMessage, index: messages.length});
+    
+    // Update messages state
+    const updatedMessages = [...messages, newMessage];
+    setMessages(updatedMessages);
+    console.log("UPDATED MESSAGES ARRAY:", updatedMessages);
+    
+    // Clear input
     setInputText('');
+    
+    // Force immediate update
+    forceRerender();
     scrollToBottom();
     
     // Show typing indicator
@@ -447,10 +484,9 @@ export default function ChatScreen({
 
     try {
       console.log('Making API call to:', `${API_URL}/llm/chat/message`);
-      console.log('Request body:', JSON.stringify({
-        chatId: selectedChatId,
-        message: currentText
-      }, null, 2));
+      
+      // Slight delay to ensure UI updates
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       const response = await fetch(`${API_URL}/llm/chat/message`, {
         method: 'POST',
@@ -473,11 +509,15 @@ export default function ChatScreen({
       }
 
       const data = await response.json();
-      console.log('Bot response:', data); // Debug log
+      console.log('Bot response:', data);
+      
+      // Keep typing indicator for at least 500ms
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       // Hide typing indicator
       setIsTyping(false);
       
+      // Create bot message
       const aiResponse: Message = {
         id: (Date.now() + 1).toString(),
         text: data.message || 'Sorry, I could not process your request.',
@@ -487,8 +527,17 @@ export default function ChatScreen({
         sessionStatus: data.sessionStatus,
         chainStatus: data.chainStatus
       };
-
-      setMessages(prev => [...prev, aiResponse]);
+      
+      // Directly render the bot message into messageElements
+      messageElements.current[aiResponse.id] = renderMessage({item: aiResponse, index: updatedMessages.length});
+      
+      // Update messages state with the new bot message
+      const finalMessages = [...updatedMessages, aiResponse];
+      setMessages(finalMessages);
+      console.log("FINAL MESSAGES ARRAY WITH BOT:", finalMessages);
+      
+      // Force another update
+      forceRerender();
       scrollToBottom();
 
       // Check if session status has changed
@@ -513,18 +562,36 @@ export default function ChatScreen({
       ));
     } catch (error) {
       console.error('Error sending message:', error);
+      
+      // Hide typing indicator
+      setIsTyping(false);
+      
       const shouldRetry = await handleAuthError(error);
-      if (shouldRetry) {
-        // Don't resend the message automatically, just show error
-        const errorMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          text: 'Sorry, there was an error sending your message. Please try again.',
-          isUser: false,
-          timestamp: new Date(),
-          sender: 'system',
-        };
-        setMessages(prev => [...prev, errorMessage]);
-        scrollToBottom();
+      
+      // Show error message
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: shouldRetry 
+          ? 'There was a connection issue. Please try sending your message again.' 
+          : 'Sorry, there was an error sending your message. Please try again later.',
+        isUser: false,
+        timestamp: new Date(),
+        sender: 'system',
+      };
+      
+      // Add error message to both state and direct rendering
+      messageElements.current[errorMessage.id] = renderMessage({item: errorMessage, index: messages.length + 1});
+      setMessages(prev => [...prev, errorMessage]);
+      
+      // Force update
+      forceRerender();
+      scrollToBottom();
+      
+      // Backup: reload from server
+      if (selectedChatId) {
+        setTimeout(() => {
+          forceRerender();
+        }, 200);
       }
     }
   };
@@ -533,6 +600,8 @@ export default function ChatScreen({
     if (flatListRef.current) {
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
+        // Hide scroll button when we've scrolled to bottom
+        setShowScrollToBottom(false);
       }, 100);
     }
   };
@@ -545,7 +614,7 @@ export default function ChatScreen({
     const combinedMessages: Message[] = [];
     
     try {
-      // Load messages for each session in the chain
+    
       for (let i = 0; i < chainContext.allSessions.length; i++) {
         const session = chainContext.allSessions[i];
         const isLastSession = i === chainContext.allSessions.length - 1;
@@ -625,22 +694,22 @@ export default function ChatScreen({
           ref.current.measureLayout(
             flatListRef.current.getScrollableNode(),
             (_, y) => {
-              flatListRef.current?.scrollToOffset({
-                offset: y - 60, // Subtract header height
-                animated: true
-              });
+              if (flatListRef.current?.scrollTo) {
+                flatListRef.current.scrollTo({
+                  y: y - 60, // Subtract header height
+                  animated: true
+                });
+              }
             },
             () => {
               // Fallback method if measureLayout fails
               const index = allMessages.findIndex(
                 msg => msg.isSessionMarker && msg.sessionId === sessionId
               );
-              if (index !== -1) {
-                flatListRef.current?.scrollToIndex({
-                  index,
-                  animated: true,
-                  viewPosition: 0,
-                  viewOffset: -60
+              if (index !== -1 && flatListRef.current?.scrollToEnd) {
+                // Just scroll to the end if we can't find a good position
+                flatListRef.current.scrollToEnd({
+                  animated: true
                 });
               }
             }
@@ -826,7 +895,6 @@ export default function ChatScreen({
         }
       }
     } else if (!selectedChatId && !isFromRecentChat) {
-      // If this is a new chat without a selected chat ID, initiate a new chat
       initiateChat();
     }
     
@@ -836,7 +904,7 @@ export default function ChatScreen({
     }
   }, [initialChatId, scheduledSessions, chainContext]);
 
-  // Add this function before the render method
+  // Enhance the TypingIndicator for better visibility
   const TypingIndicator = () => {
     return (
       <View style={[
@@ -859,7 +927,7 @@ export default function ChatScreen({
         ]}>
           <View style={styles.typingContainer}>
             {[0, 1, 2].map((i) => (
-              <View 
+              <Animated.View 
                 key={`dot-${i}`}
                 style={[
                   styles.typingDot, 
@@ -876,6 +944,17 @@ export default function ChatScreen({
     );
   };
 
+  // Add a function to handle scroll events
+  const handleScroll = (event: any) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    const contentHeight = event.nativeEvent.contentSize.height;
+    const scrollViewHeight = event.nativeEvent.layoutMeasurement.height;
+    
+    // If we're more than 200px from the bottom, show the button
+    const isCloseToBottom = contentHeight - offsetY - scrollViewHeight < 200;
+    setShowScrollToBottom(!isCloseToBottom);
+  };
+
   if (isLoading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: isDarkMode ? '#121A2E' : '#F5F5F5' }]}>
@@ -885,15 +964,18 @@ export default function ChatScreen({
   }
 
   return (
-    <SafeAreaView style={[styles.container, { 
-      backgroundColor: isDarkMode ? '#0F1525' : '#F5F5F5',
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      marginTop: 0,
-    }]} edges={['bottom', 'left', 'right']}>
+    <SafeAreaView 
+      style={[styles.container, { 
+        backgroundColor: isDarkMode ? '#0F1525' : '#F5F5F5',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        marginTop: 0,
+      }]} 
+      edges={['bottom', 'left', 'right']}
+    >
       <View style={styles.mainContent}>
         <View style={[styles.header, {
           backgroundColor: '#2C5EE6',
@@ -950,53 +1032,87 @@ export default function ChatScreen({
             flexGrow: 1, 
             paddingBottom: verticalScale(80) // Space for the input box
           }}
-          ref={(scrollRef) => {
-            // @ts-ignore
-            flatListRef.current = scrollRef;
-          }}
+          ref={flatListRef}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={true}
           scrollEventThrottle={16}
+          onScroll={handleScroll}
         >
-          <View style={styles.messagesContainer}>
-        {!activeSession && !selectedChatId ? (
-          <View style={[styles.noSessionContainer, { 
-                backgroundColor: isDarkMode ? '#0F1525' : '#F5F5F5' 
-          }]}>
-            <Ionicons name="chatbubbles-outline" size={48} color={theme.COLORS.text.secondary} />
-            <Text style={[styles.noSessionTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
-              Start a New Chat
-            </Text>
-            <Text style={[styles.noSessionText, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
-              Select a chat from history or start a new conversation
-            </Text>
-          </View>
+          <View style={styles.messagesContainer} ref={messagesContainerRef}>
+            {!activeSession && !selectedChatId ? (
+              <View style={[styles.noSessionContainer, { 
+                    backgroundColor: isDarkMode ? '#0F1525' : '#F5F5F5' 
+              }]}>
+                <Ionicons name="chatbubbles-outline" size={48} color={theme.COLORS.text.secondary} />
+                <Text style={[styles.noSessionTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
+                  Start a New Chat
+                </Text>
+                <Text style={[styles.noSessionText, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
+                  Select a chat from history or start a new conversation
+                </Text>
+              </View>
             ) : isLoading ? (
               <View style={[styles.loadingContainer, { backgroundColor: isDarkMode ? '#0F1525' : '#F5F5F5' }]}>
                 <ActivityIndicator size="large" color={theme.COLORS.primary.main} />
               </View>
             ) : (
-              <View style={styles.messageList}>
+              <View style={styles.messageList} key={`message-list-${messageKey}`}>
                 {(chainContext ? allMessages : messages).length === 0 ? (
-                    <View style={styles.emptyContainer}>
-                      <Text style={[styles.emptyText, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
+                  <View style={styles.emptyContainer}>
+                    <Text style={[styles.emptyText, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
                       {chainContext ? 'No messages in this chain' : 'No messages yet. Start a conversation!'}
-                                </Text>
-                        </View>
-                      ) : (
-                  <>
-                    {(chainContext ? allMessages : messages).map((item, index) => renderMessage({item, index}))}
+                    </Text>
+                  </View>
+                ) : (
+                  <View>
+                    {/* Primary message rendering */}
+                    {(chainContext ? allMessages : messages).map((item, index) => (
+                      <View key={`msg-${item.id}-${messageKey}`}>
+                        {renderMessage({item, index})}
+                      </View>
+                    ))}
+                    
+                    {/* Fallback rendering using directly stored elements */}
+                    {Object.values(messageElements.current)}
                     
                     {/* Typing indicator */}
-                    {isTyping && (
-                      <TypingIndicator />
-                    )}
-                  </>
+                    {isTyping && <TypingIndicator />}
+                  </View>
                 )}
               </View>
             )}
-                    </View>
+          </View>
         </ScrollView>
+
+        {/* Scroll to bottom button - only shown when scrolled up */}
+        {showScrollToBottom && (
+          <TouchableOpacity 
+            style={{
+              position: 'absolute',
+              left: '50%',
+              bottom: 100, // Position much higher above the input box
+              transform: [{ translateX: -25 }], // Half of width for centering
+              backgroundColor: '#2C5EE6',
+              width: 50,
+              height: 50,
+              borderRadius: 25,
+              justifyContent: 'center',
+              alignItems: 'center',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 5 },
+              shadowOpacity: 0.4,
+              shadowRadius: 3,
+              elevation: 8,
+              zIndex: 100,
+              borderWidth: 2,
+              borderColor: 'rgba(255, 255, 255, 0.6)',
+            }}
+            onPress={scrollToBottom}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="chevron-down" size={28} color="white" />
+          </TouchableOpacity>
+        )}
 
         {(!isReadOnly) && (
           <KeyboardAvoidingView
@@ -1239,8 +1355,8 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: verticalScale(40),
     maxHeight: verticalScale(100),
+    paddingVertical: verticalScale(6),
     paddingHorizontal: horizontalScale(16),
-    paddingVertical: verticalScale(8),
     marginRight: horizontalScale(8),
     fontSize: fontScale(16),
     ...theme.FONTS.regular,
@@ -1467,5 +1583,24 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginHorizontal: 2,
     opacity: 0.6
+  },
+  scrollToBottomButton: {
+    position: 'absolute',
+    left: '50%',
+    bottom: 100,
+    transform: [{ translateX: -25 }], // Half of width for centering
+    backgroundColor: '#2C5EE6',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.4,
+    shadowRadius: 3,
+    elevation: 8,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
   },
 }); 
