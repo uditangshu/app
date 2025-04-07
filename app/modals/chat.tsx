@@ -142,6 +142,21 @@ export default function ChatScreen({
   const messagesContainerRef = useRef<View>(null);
   const messageElements = useRef<{[key: string]: React.ReactNode}>({});
 
+  // Add a new state variable to track session status from messages
+  const [messageSessionStatus, setMessageSessionStatus] = useState<string | null>(null);
+
+  // Add an effect to update the session status from messages
+  useEffect(() => {
+    // Check if any message has sessionStatus
+    const messagesWithStatus = messages.filter(m => m.sessionStatus);
+    if (messagesWithStatus.length > 0) {
+      // Use the most recent message with status
+      const latestStatusMessage = messagesWithStatus[messagesWithStatus.length - 1];
+      console.log("Found message with session status:", latestStatusMessage.sessionStatus);
+      setMessageSessionStatus(latestStatusMessage.sessionStatus || null);
+    }
+  }, [messages]);
+
   // Voice recognition setup
   useEffect(() => {
     // Make sure Voice is defined before setting event handlers
@@ -652,7 +667,6 @@ export default function ChatScreen({
           sender: 'system',
         };
         setMessages(prev => [...prev, errorMessage]);
-        forceRerender();
         scrollToBottom();
       }
       return;
@@ -668,20 +682,15 @@ export default function ChatScreen({
       timestamp: new Date(),
       sender: 'emp',
     };
-
-    // Immediately render the user message directly into the messageElements ref
-    messageElements.current[newMessage.id] = renderMessage({item: newMessage, index: messages.length});
     
     // Update messages state
     const updatedMessages = [...messages, newMessage];
     setMessages(updatedMessages);
-    console.log("UPDATED MESSAGES ARRAY:", updatedMessages);
     
     // Clear input
     setInputText('');
     
-    // Force immediate update
-    forceRerender();
+    // Scroll to bottom to show the new message
     scrollToBottom();
     
     // Show typing indicator
@@ -689,9 +698,6 @@ export default function ChatScreen({
 
     try {
       console.log('Making API call to:', `${API_URL}/llm/chat/message`);
-      
-      // Slight delay to ensure UI updates
-      await new Promise(resolve => setTimeout(resolve, 300));
       
       const response = await fetch(`${API_URL}/llm/chat/message`, {
         method: 'POST',
@@ -733,26 +739,17 @@ export default function ChatScreen({
         chainStatus: data.chainStatus
       };
       
-      // Directly render the bot message into messageElements
-      messageElements.current[aiResponse.id] = renderMessage({item: aiResponse, index: updatedMessages.length});
-      
       // Update messages state with the new bot message
-      const finalMessages = [...updatedMessages, aiResponse];
-      setMessages(finalMessages);
-      console.log("FINAL MESSAGES ARRAY WITH BOT:", finalMessages);
+      setMessages([...updatedMessages, aiResponse]);
       
-      // Force another update
-      forceRerender();
-      scrollToBottom();
-
-      // Check if session status has changed
-      if (data.sessionStatus && activeSession) {
-        const updatedSession = {
-          ...activeSession,
-          status: data.sessionStatus
-        };
-        setActiveSession(updatedSession);
+      // Check and update the session status from the bot response
+      if (data.sessionStatus) {
+        console.log("Received sessionStatus from API:", data.sessionStatus);
+        setMessageSessionStatus(data.sessionStatus);
       }
+      
+      // Scroll to bottom to show the bot's response
+      scrollToBottom();
 
       // Update chat history
       setChatHistory(prev => prev.map(chat => 
@@ -784,20 +781,11 @@ export default function ChatScreen({
         sender: 'system',
       };
       
-      // Add error message to both state and direct rendering
-      messageElements.current[errorMessage.id] = renderMessage({item: errorMessage, index: messages.length + 1});
+      // Add error message
       setMessages(prev => [...prev, errorMessage]);
       
-      // Force update
-      forceRerender();
+      // Scroll to bottom to show the error message
       scrollToBottom();
-      
-      // Backup: reload from server
-      if (selectedChatId) {
-        setTimeout(() => {
-          forceRerender();
-        }, 200);
-      }
     }
   };
 
@@ -1021,9 +1009,9 @@ export default function ChatScreen({
         <Text style={[
           styles.messageText, 
           { 
-                  color: item.isUser ? 'white' : (isDarkMode ? 'rgba(255, 255, 255, 0.95)' : '#333333'),
-                  fontStyle: item.isSystemMessage ? 'italic' : 'normal',
-                  fontWeight: item.text.includes('error') || item.text.includes('Error') ? '500' : 'normal'
+            color: item.isUser ? "#ffffff" : (isDarkMode ? 'rgba(255, 255, 255, 0.95)' : '#333333'),
+            fontStyle: item.isSystemMessage ? 'italic' : 'normal',
+            fontWeight: item.text.includes('error') || item.text.includes('Error') ? '500' : 'normal'
           }
         ]}>
           {item.text}
@@ -1052,7 +1040,21 @@ export default function ChatScreen({
       style={[
         styles.chatHistoryItem,
         selectedChatId === item.chat_id && styles.selectedChatItem,
-        { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }
+        { 
+          backgroundColor: selectedChatId === item.chat_id 
+            ? (isDarkMode ? 'rgba(44, 94, 230, 0.2)' : 'rgba(44, 94, 230, 0.15)') 
+            : (isDarkMode ? 'rgba(30, 40, 60, 0.3)' : 'rgba(0,0,0,0.03)'),
+          marginBottom: 8,
+          borderRadius: 10,
+          padding: moderateScale(12),
+          borderLeftWidth: selectedChatId === item.chat_id ? 3 : 0,
+          borderLeftColor: '#2C5EE6',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: selectedChatId === item.chat_id ? 0.2 : 0,
+          shadowRadius: 2,
+          elevation: selectedChatId === item.chat_id ? 2 : 0,
+        }
       ]}
       onPress={() => handleChatSelect(item.chat_id)}
     >
@@ -1061,20 +1063,51 @@ export default function ChatScreen({
         {chainContext && item.session_id && (
           <Text style={[
             styles.sessionIdText, 
-            { color: theme.COLORS.primary.main }
+            { 
+              color: theme.COLORS.primary.main,
+              fontSize: fontScale(13),
+              fontWeight: '600',
+              marginBottom: 4
+            }
           ]}>
-            Session ID: {item.session_id}
+            Session {item.session_id.substring(0, 8)}
           </Text>
         )}
         <Text 
-          style={[styles.chatHistoryMessage, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}
-          numberOfLines={1}
+          style={[
+            styles.chatHistoryMessage, 
+            { 
+              color: isDarkMode ? 'rgba(255,255,255,0.9)' : theme.COLORS.text.primary,
+              fontSize: fontScale(14),
+              fontWeight: selectedChatId === item.chat_id ? '500' : 'normal',
+              marginTop: 2
+            }
+          ]}
+          numberOfLines={2}
         >
           {item.last_message}
         </Text>
         {item.unread_count > 0 && (
-          <View style={[styles.unreadBadge, { backgroundColor: theme.COLORS.primary.main }]}>
-            <Text style={styles.unreadCount}>{item.unread_count}</Text>
+          <View style={[
+            styles.unreadBadge, 
+            { 
+              backgroundColor: theme.COLORS.primary.main,
+              borderRadius: 12,
+              minWidth: 24,
+              height: 24,
+              alignItems: 'center',
+              justifyContent: 'center',
+              paddingHorizontal: 5
+            }
+          ]}>
+            <Text style={[
+              styles.unreadCount,
+              {
+                color: theme.COLORS.background.paper,
+                fontSize: fontScale(12),
+                fontWeight: '600'
+              }
+            ]}>{item.unread_count}</Text>
           </View>
         )}
       </View>
@@ -1160,17 +1193,40 @@ export default function ChatScreen({
     setShowScrollToBottom(!isCloseToBottom);
   };
 
-  // Add a function to check if input should be enabled
+  // Update the function to check if input should be enabled
   const canSendMessages = () => {
-    // If session is explicitly marked as active, allow sending
-    if (sessionStatus === 'active') return true;
+    // Debugging info
+    console.log("Session status checks:", {
+      sessionStatusProp: sessionStatus,
+      activeSessionStatus: activeSession?.status,
+      messageSessionStatus
+    });
+
+    // If any message has sessionStatus of active, allow sending
+    if (messageSessionStatus === 'active') {
+      console.log("Allowing messages because message sessionStatus is active");
+      return true;
+    }
+    
+    // If session is explicitly marked as active via prop, allow sending
+    if (sessionStatus === 'active') {
+      console.log("Allowing messages because sessionStatus prop is active");
+      return true;
+    }
     
     // If we have an active session and it's status is active, allow sending
-    if (activeSession && activeSession.status === 'active') return true;
+    if (activeSession && activeSession.status === 'active') {
+      console.log("Allowing messages because activeSession status is active");
+      return true;
+    }
     
     // If no explicit status restrictions are set (backward compatibility)
-    if (!sessionStatus && !activeSession) return true;
+    if (!sessionStatus && !activeSession && !messageSessionStatus) {
+      console.log("Allowing messages because no status restrictions");
+      return true;
+    }
     
+    console.log("Not allowing messages - no active status found");
     return false;
   };
 
@@ -1213,7 +1269,7 @@ export default function ChatScreen({
           zIndex: 10,
         }]}>
           <TouchableOpacity onPressIn={toggleSidebar} style={{padding: moderateScale(6)}}>
-            <Ionicons name="menu" size={24} color={'white'} />
+            <Ionicons name="menu" size={24} color={theme.COLORS.background.paper} />
           </TouchableOpacity>
           
           {/* Title in center */}
@@ -1223,7 +1279,8 @@ export default function ChatScreen({
             alignItems: 'center',
           }}>
             <Text style={[styles.headerTitle, { 
-              color: 'white',
+              color: '#ffffff',
+              fontWeight: '600',
             }]}>
               {selectedChatId ? 'Conversation' : 'New Chat'}
             </Text>
@@ -1263,7 +1320,7 @@ export default function ChatScreen({
                     backgroundColor: isDarkMode ? '#0F1525' : '#F5F5F5' 
               }]}>
                 <Ionicons name="chatbubbles-outline" size={48} color={theme.COLORS.text.secondary} />
-                <Text style={[styles.noSessionTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
+                <Text style={[styles.noSessionTitle, { color: isDarkMode ? theme.COLORS.background.paper : theme.COLORS.text.primary }]}>
                   Start a New Chat
                 </Text>
                 <Text style={[styles.noSessionText, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
@@ -1290,9 +1347,6 @@ export default function ChatScreen({
                         {renderMessage({item, index})}
                       </View>
                     ))}
-                    
-                    {/* Fallback rendering using directly stored elements */}
-                    {Object.values(messageElements.current)}
                     
                     {/* Typing indicator */}
                     {isTyping && <TypingIndicator />}
@@ -1321,7 +1375,7 @@ export default function ChatScreen({
             style={styles.inputWrapper}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
             <View style={[styles.inputContainer, {
-              backgroundColor: isDarkMode ? 'rgba(20, 30, 60, 0.95)' : 'white',
+              backgroundColor: isDarkMode ? 'rgba(20, 30, 60, 0.95)' : theme.COLORS.background.paper,
               borderTopColor: isDarkMode ? 'rgba(44, 94, 230, 0.2)' : 'rgba(0,0,0,0.1)',
               borderTopWidth: 1,
               shadowColor: '#000',
@@ -1329,14 +1383,24 @@ export default function ChatScreen({
               shadowOpacity: 0.1,
               shadowRadius: 3,
               elevation: 5,
+              paddingVertical: moderateScale(12),
+              paddingHorizontal: moderateScale(16),
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
             }]}>
               <TextInput
                 style={[styles.input, {
                   backgroundColor: isDarkMode ? 'rgba(40, 50, 80, 0.8)' : 'rgba(0,0,0,0.05)',
-                  color: isDarkMode ? 'white' : theme.COLORS.text.primary,
-                  borderRadius: 20,
-                  borderWidth: 1,
-                  borderColor: isDarkMode ? 'rgba(60, 80, 120, 0.5)' : 'rgba(0,0,0,0.1)',
+                  color: isDarkMode ? '#ffffff' : theme.COLORS.text.primary,
+                  borderRadius: 24,
+                  borderWidth: isDarkMode ? 1 : 0,
+                  borderColor: isDarkMode ? 'rgba(60, 80, 120, 0.5)' : 'transparent',
+                  paddingVertical: moderateScale(12),
+                  paddingHorizontal: moderateScale(16),
+                  fontSize: fontScale(16),
+                  maxHeight: verticalScale(100),
+                  flex: 1,
                 }]}
                 value={inputText}
                 onChangeText={setInputText}
@@ -1345,7 +1409,7 @@ export default function ChatScreen({
                 multiline
               />
               
-              {/* Microphone Button */}
+              {/* Microphone Button - Updated style */}
               <TouchableOpacity
                 style={[
                   styles.micButton, 
@@ -1354,6 +1418,10 @@ export default function ChatScreen({
                       (isDarkMode ? 'rgba(255, 80, 80, 0.8)' : '#ff5050') : 
                       (isDarkMode ? 'rgba(80, 100, 140, 0.8)' : 'rgba(44, 94, 230, 0.7)'),
                     marginRight: 8,
+                    marginLeft: 12,
+                    width: 48,
+                    height: 48,
+                    borderRadius: 24,
                     elevation: 3,
                     shadowColor: '#000',
                     shadowOffset: { width: 0, height: 1 },
@@ -1364,17 +1432,21 @@ export default function ChatScreen({
                 onPress={startDictation}>
                 <Ionicons
                   name={isDictating ? "mic" : "mic-outline"}
-                  size={24}
-                  color="white"
+                  size={28}
+                  color={theme.COLORS.background.paper}
                 />
               </TouchableOpacity>
               
+              {/* Send Button - Updated style */}
               <TouchableOpacity
                 style={[
                   styles.sendButton, 
                   { 
                     backgroundColor: inputText.trim() ? '#2C5EE6' : (isDarkMode ? 'rgba(30,40,60,0.7)' : 'rgba(0,0,0,0.05)'),
                     opacity: !inputText.trim() ? 0.5 : 1,
+                    width: 48,
+                    height: 48,
+                    borderRadius: 24,
                     elevation: 3,
                     shadowColor: '#000',
                     shadowOffset: { width: 0, height: 1 },
@@ -1386,8 +1458,8 @@ export default function ChatScreen({
                 disabled={!inputText.trim()}>
                 <Ionicons
                   name="send"
-                  size={24}
-                  color={inputText.trim() ? 'white' : (isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)')}
+                  size={28}
+                  color={inputText.trim() ? theme.COLORS.background.paper : (isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)')}
                 />
               </TouchableOpacity>
             </View>
@@ -1407,7 +1479,8 @@ export default function ChatScreen({
               padding: 16,
               fontSize: fontScale(15)
             }}>
-              This session is not active. You cannot send messages.
+              This session is {messageSessionStatus || sessionStatus || activeSession?.status || 'not active'}. 
+              {messageSessionStatus === 'inactive' && " You cannot send messages."}
             </Text>
           </View>
         )}
@@ -1417,23 +1490,43 @@ export default function ChatScreen({
       <Animated.View style={[
         styles.sidebar,
         {
-          backgroundColor: isDarkMode ? 'rgba(0,0,0,0.95)' : 'rgba(255,255,255,0.95)',
+          backgroundColor: isDarkMode ? 'rgba(15, 20, 35, 0.98)' : theme.COLORS.background.paper,
           borderRightColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
           borderRightWidth: 1,
           transform: [{ translateX: isSidebarOpen ? 0 : -Dimensions.get('window').width }],
+          shadowColor: '#000',
+          shadowOffset: { width: 2, height: 0 },
+          shadowOpacity: 0.25,
+          shadowRadius: 8,
+          elevation: 10,
         }
       ]}>
         <View style={[styles.sidebarHeader, {
           borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+          backgroundColor: isDarkMode ? 'rgba(20, 30, 60, 0.95)' : '#2C5EE6',
+          paddingVertical: moderateScale(14),
+          paddingHorizontal: moderateScale(16),
+          borderBottomWidth: 1,
         }]}>
-          <Text style={[styles.sidebarTitle, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>
-            {chainContext ? 'Chain Sessions' : 'Session History'}
+          <Text style={[styles.sidebarTitle, { 
+            color: theme.COLORS.background.paper,
+            fontWeight: '600',
+            fontSize: fontScale(18),
+          }]}>
+            {chainContext ? 'Chain Sessions' : 'Chat History'}
           </Text>
-          <TouchableOpacity onPressIn={toggleSidebar}>
+          <TouchableOpacity 
+            onPressIn={toggleSidebar}
+            style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              borderRadius: 20,
+              padding: 8,
+            }}
+          >
             <Ionicons 
               name="chevron-back" 
               size={24} 
-              color={isDarkMode ? 'white' : theme.COLORS.text.primary} 
+              color={theme.COLORS.background.paper}
             />
           </TouchableOpacity>
         </View>
@@ -1441,10 +1534,27 @@ export default function ChatScreen({
           data={chainContext ? chainSessions : chatHistory}
           renderItem={renderChatHistoryItem}
           keyExtractor={item => chainContext && item.session_id ? `${item.chat_id}-${item.session_id}` : `chat-${item.chat_id}`}
-          contentContainerStyle={styles.chatHistoryList}
+          contentContainerStyle={[styles.chatHistoryList, {
+            paddingVertical: moderateScale(8),
+            paddingHorizontal: moderateScale(8),
+          }]}
           ListEmptyComponent={() => (
-            <View style={styles.emptyContainer}>
-              <Text style={[styles.emptyText, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
+            <View style={[styles.emptyContainer, {
+              padding: moderateScale(24),
+              alignItems: 'center',
+              justifyContent: 'center',
+            }]}>
+              <Ionicons 
+                name={chainContext ? "document-text-outline" : "chatbubble-outline"} 
+                size={48} 
+                color={isDarkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)'} 
+              />
+              <Text style={[styles.emptyText, { 
+                color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary,
+                marginTop: moderateScale(12),
+                fontSize: fontScale(16),
+                textAlign: 'center',
+              }]}>
                 {chainContext ? 'No sessions in this chain' : 'No chat history available'}
               </Text>
             </View>
@@ -1489,7 +1599,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: fontScale(18),
-    color: 'white',
+    color: theme.COLORS.background.paper,
     ...theme.FONTS.medium,
     textAlign: 'center',
   },
@@ -1554,7 +1664,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   unreadCount: {
-    color: 'white',
+    color: theme.COLORS.background.paper,
     fontSize: fontScale(12),
     fontWeight: 'bold',
   },
@@ -1573,6 +1683,7 @@ const styles = StyleSheet.create({
   },
   userBubble: {
     backgroundColor: '#2C5EE6',
+    borderRadius: 20,
   },
   aiBubble: {
     backgroundColor: '#333333', // This will be overridden in the component
@@ -1667,7 +1778,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(44, 94, 230, 0.1)',
   },
   unreadBadgeText: {
-    color: 'white',
+    color: theme.COLORS.background.paper,
     fontSize: fontScale(12),
     fontWeight: 'bold',
   },
@@ -1802,13 +1913,10 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   inputWrapper: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     width: '100%',
-    zIndex: 100,
     backgroundColor: 'transparent',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.1)',
   },
   
   messagesContainer: {
