@@ -9,7 +9,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   icon: './assets/icon.png',
   userInterfaceStyle: 'dark',
   splash: {
-    image: './assets/splash.png',
+    image: './assets/DeLogo.png',
     resizeMode: 'contain',
     backgroundColor: '#000000'
   },
@@ -18,11 +18,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ],
   ios: {
     supportsTablet: true,
-    bundleIdentifier: 'com.yourcompany.employeeportal'
+    bundleIdentifier: 'com.yourcompany.employeeportal',
+    infoPlist: {
+      ITSAppUsesNonExemptEncryption: false
+    }
   },
   android: {
     adaptiveIcon: {
-      foregroundImage: './assets/adaptive-icon.png',
+      foregroundImage: './assets/Dlogo.png',
       backgroundColor: '#000000'
     },
     package: 'com.yourcompany.employeeportal'

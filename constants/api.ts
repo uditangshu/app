@@ -1,1 +1,1 @@
-export const API_URL = 'https://velvety-ray-454718-b8.ue.r.appspot.com'; 
+export const API_URL = 'https://fastapi-service-402737687767.us-central1.run.app';

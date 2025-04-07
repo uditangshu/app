@@ -13,6 +13,7 @@ import {
   Animated,
   ToastAndroid,
   ScrollView,
+  PermissionsAndroid,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,7 +23,21 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useRouter } from 'expo-router';
 import { API_URL } from '../../constants/api';
-import * as Speech from 'expo-speech';
+
+// Import Voice with safer fallback
+let Voice: any = null;
+// Wrap in a function to avoid top-level errors affecting the whole app
+const importVoice = () => {
+  try {
+    return require('@react-native-voice/voice').default;
+  } catch (error) {
+    console.error('Failed to import Voice module');
+    return null;
+  }
+};
+
+// Initialize Voice outside of component
+Voice = importVoice();
 
 interface Message {
   id: string;
@@ -86,6 +101,7 @@ interface ChatScreenProps {
   scheduledSessions?: ScheduledSession[];
   showScrollIndicator?: boolean;
   chainContext?: any;
+  sessionStatus?: string;
 }
 
 export default function ChatScreen({ 
@@ -95,7 +111,8 @@ export default function ChatScreen({
   isReadOnly = false, 
   scheduledSessions = [],
   showScrollIndicator = false,
-  chainContext
+  chainContext,
+  sessionStatus
 }: ChatScreenProps) {
   const { accessToken, refreshAccessToken, logout } = useAuth();
   const { theme, isDarkMode } = useTheme();
@@ -118,11 +135,197 @@ export default function ChatScreen({
   const [messageKey, setMessageKey] = useState(0);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [isDictating, setIsDictating] = useState(false);
+  const [results, setResults] = useState<string[]>([]);
   
   // Add a forceUpdate mechanism
   const [, forceUpdate] = useState({});
   const messagesContainerRef = useRef<View>(null);
   const messageElements = useRef<{[key: string]: React.ReactNode}>({});
+
+  // Voice recognition setup
+  useEffect(() => {
+    // Make sure Voice is defined before setting event handlers
+    if (Voice) {
+      try {
+        // Initialize voice recognition
+        Voice.onSpeechStart = onSpeechStart;
+        Voice.onSpeechEnd = onSpeechEnd;
+        Voice.onSpeechResults = onSpeechResults;
+        Voice.onSpeechError = onSpeechError;                                                                                       
+
+        // Set up Voice instance - using a simpler approach
+        const setupVoice = async () => {
+          try {
+            // No need to call getSpeechRecognitionServices as it's causing errors
+            console.log('Voice recognition initialized');
+          } catch (e) {
+            console.error('Error initializing speech recognition:', e);
+          }
+        };
+
+        setupVoice();
+        
+        // Return cleanup function
+        return () => {
+         
+          if (Voice) {
+            Voice.destroy().then(() => {
+              Voice.removeAllListeners();
+            }).catch((e:any) => {
+              console.error('Error destroying Voice instance:', e);
+            });
+          }
+        };
+      } catch (e) {
+        console.error('Error setting up Voice event handlers:', e);
+      }
+    } else {
+      console.error('Voice module is undefined - speech recognition will not work');
+    }
+  }, []);
+
+  const onSpeechStart = () => {
+    console.log('Speech recognition started');
+  };
+
+  const onSpeechEnd = () => {
+    console.log('Speech recognition ended');
+    setIsDictating(false);
+  };
+
+  const onSpeechResults = (e: any) => {
+    if (e.value && e.value.length > 0) {
+      setResults(e.value);
+      // Set the first result as the input text
+      setInputText((prev) => prev + ' ' + e.value[0]);
+    }
+  };
+
+  const onSpeechError = (e: any) => {
+    console.error('Speech recognition error:', e);
+    setIsDictating(false);
+    
+    // Show more specific error message based on error code
+    let errorMessage = 'Speech recognition error';
+    
+    if (e.error) {
+      switch (e.error.code) {
+        case '7':
+        case '7':
+          errorMessage = 'No speech detected. Please try again.';
+          break;
+        case '5':
+          errorMessage = 'Speech recognition timeout. Please try again.';
+          break;
+        case '4':
+          errorMessage = 'Speech recognition service error. Please try again.';
+          break;
+        case '3':
+          errorMessage = 'Audio recording error. Please check your microphone.';
+          break;
+        case '1':
+        case '2':
+          errorMessage = 'Network error. Please check your connection.';
+          break;
+        default:
+          errorMessage = `Speech recognition error (${e.error.code}). Please try again.`;
+      }
+    }
+    
+    // Show error toast on Android
+    if (Platform.OS === 'android') {
+      ToastAndroid.show(errorMessage, ToastAndroid.LONG);
+    }
+  };
+
+  const startDictation = async () => {
+    // Check if Voice is defined first
+    if (!Voice) {
+      console.error('Voice recognition is not available');
+      if (Platform.OS === 'android') {
+        ToastAndroid.show('Speech recognition is not available on this device', ToastAndroid.LONG);
+      }
+      return;
+    }
+    
+    // If already dictating, stop
+    if (isDictating) {
+      try {
+        await Voice.stop();
+        setIsDictating(false);
+      } catch (e) {
+        console.error('Error stopping voice recognition:', e);
+        // Force the state to reset even if there was an error
+        setIsDictating(false);
+      }
+      return;
+    }
+
+    // Request microphone permission on Android - improved implementation
+    if (Platform.OS === 'android') {
+      try {
+        // Check if we already have the permission
+        const hasPermission = await PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
+        );
+        
+        if (hasPermission) {
+          // We already have permission, proceed with voice recognition
+          console.log('Microphone permission already granted');
+        } else {
+          // Request permission
+          const granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+            {
+              title: 'Microphone Permission Required',
+              message: 'Please allow microphone access to use voice recognition',
+              buttonNeutral: 'Ask Me Later',
+              buttonNegative: 'Cancel',
+              buttonPositive: 'OK',
+            }
+          );
+          
+          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+            console.log('Microphone permission denied');
+            if (Platform.OS === 'android') {
+              ToastAndroid.show('Microphone permission is required for voice recognition', ToastAndroid.LONG);
+            }
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('Error checking microphone permission:', err);
+        return;
+      }
+    }
+
+    // Start voice recognition
+    try {
+      // Reset any previous results
+      setResults([]);
+      
+      // Start the voice recognition service
+      console.log('Starting voice recognition...');
+      
+      // Set the state to dictating first (for UI feedback)
+      setIsDictating(true);
+      
+      // Start listening with proper error handling
+      try {
+        await Voice.start('en-US');
+      } catch (e) {
+        console.error('Error starting voice recognition:', e);
+        setIsDictating(false); // Reset the state if starting fails
+        
+        if (Platform.OS === 'android') {
+          ToastAndroid.show('Failed to start speech recognition. Please try again.', ToastAndroid.SHORT);
+        }
+      }
+    } catch (e) {
+      console.error('Unexpected error in speech recognition:', e);
+      setIsDictating(false);
+    }
+  };
   
   // Add a dedicated function to force rerender
   const forceRerender = () => {
@@ -150,40 +353,6 @@ export default function ChatScreen({
   const handleSidebarPress = () => {
     if (isSidebarOpen) {
       setIsSidebarOpen(false);
-    }
-  };
-
-  const simulateDictation = async () => {
-    // Toggle dictation state
-    setIsDictating(prevState => !prevState);
-    
-    if (!isDictating) {
-      // Starting dictation
-      await Speech.speak("Listening...", {
-        language: 'en',
-        pitch: 1.0,
-        rate: 0.9
-      });
-      
-      // Simulate "waiting for silence" - wait 3 seconds
-      setTimeout(() => {
-        // Provide feedback that dictation is stopping due to silence
-        Speech.speak("Stopped listening", {
-          language: 'en',
-          pitch: 1.0,
-          rate: 0.9
-        });
-        
-        // Turn off dictation mode
-        setIsDictating(false);
-      }, 3000);
-    } else {
-      // User manually stopped dictation
-      await Speech.speak("Dictation canceled", {
-        language: 'en',
-        pitch: 1.0,
-        rate: 0.9
-      });
     }
   };
 
@@ -991,6 +1160,20 @@ export default function ChatScreen({
     setShowScrollToBottom(!isCloseToBottom);
   };
 
+  // Add a function to check if input should be enabled
+  const canSendMessages = () => {
+    // If session is explicitly marked as active, allow sending
+    if (sessionStatus === 'active') return true;
+    
+    // If we have an active session and it's status is active, allow sending
+    if (activeSession && activeSession.status === 'active') return true;
+    
+    // If no explicit status restrictions are set (backward compatibility)
+    if (!sessionStatus && !activeSession) return true;
+    
+    return false;
+  };
+
   if (isLoading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: isDarkMode ? '#121A2E' : '#F5F5F5' }]}>
@@ -1131,7 +1314,8 @@ export default function ChatScreen({
           </TouchableOpacity>
         )}
 
-        {(!isReadOnly) && (
+        {/* Only render input when session is active or no restrictions are set */}
+        {(!isReadOnly && canSendMessages()) && (
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={styles.inputWrapper}
@@ -1177,7 +1361,7 @@ export default function ChatScreen({
                     shadowRadius: 2,
                   }
                 ]}
-                onPress={simulateDictation}>
+                onPress={startDictation}>
                 <Ionicons
                   name={isDictating ? "mic" : "mic-outline"}
                   size={24}
@@ -1208,6 +1392,24 @@ export default function ChatScreen({
               </TouchableOpacity>
             </View>
           </KeyboardAvoidingView>
+        )}
+
+        {/* Show message when chat is read-only due to session status */}
+        {(!isReadOnly && !canSendMessages()) && (
+          <View style={[styles.inactiveSessionNotice, {
+            backgroundColor: isDarkMode ? 'rgba(20, 30, 60, 0.95)' : 'white',
+            borderTopColor: isDarkMode ? 'rgba(44, 94, 230, 0.2)' : 'rgba(0,0,0,0.1)',
+            borderTopWidth: 1,
+          }]}>
+            <Text style={{ 
+              color: isDarkMode ? '#f5f5f5' : '#333',
+              textAlign: 'center',
+              padding: 16,
+              fontSize: fontScale(15)
+            }}>
+              This session is not active. You cannot send messages.
+            </Text>
+          </View>
         )}
       </View>
 
@@ -1652,5 +1854,13 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  inactiveSessionNotice: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 16,
+    zIndex: 100,
   },
 }); 
