@@ -9,6 +9,8 @@ import {
   Dimensions,
   PanResponder,
   AppState,
+  useWindowDimensions,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,8 +23,6 @@ import { API_URL } from '../../constants/api';
 import NotificationsModal from '../modals/notifications';
 import Shimmer from '../components/Shimmer';
 import { useTheme } from '../../contexts/ThemeContext';
-import { scheduleNotification } from '../../utils/notifications';
-import PushNotification from 'react-native-push-notification';
 
 // interface EventItem {
 //   id: string;
@@ -243,30 +243,30 @@ export default function HomeScreen() {
     try {
       // If chatId is not provided, get the most recent pending session
       if (!chatId) {
-        const pendingSessions = scheduledSessions.filter(
-          session => session.status === 'pending'
-        );
-        
-        console.log("Available pending sessions:", pendingSessions.length);
+      const pendingSessions = scheduledSessions.filter(
+        session => session.status === 'pending'
+      );
+      
+      console.log("Available pending sessions:", pendingSessions.length);
+     
+      if (pendingSessions.length === 0) {
+        console.error('No pending sessions available');
+        return;
+      }
 
-        if (pendingSessions.length === 0) {
-          console.error('No pending sessions available');
-          return;
-        }
+      // Sort by creation date to get the latest session
+      pendingSessions.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      
+      const pendingSession = pendingSessions[0];
+      console.log("Selected pending session with chatId:", pendingSession.chat_id);
 
-        // Sort by creation date to get the latest session
-        pendingSessions.sort((a, b) => 
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
-        
-        const pendingSession = pendingSessions[0];
-        console.log("Selected pending session with chatId:", pendingSession.chat_id);
-        
-        // Check if chat ID is valid
-        if (!pendingSession.chat_id) {
-          console.error("Invalid chat ID in pending session");
-          return;
-        }
+      // Check if chat ID is valid
+      if (!pendingSession.chat_id) {
+        console.error("Invalid chat ID in pending session");
+        return;
+      }
         
         chatId = pendingSession.chat_id;
       }
@@ -308,54 +308,6 @@ export default function HomeScreen() {
       setLoading(false);
     }
   };
-
-  // const fetchChats = async (pageNum: number, isLoadMore = false) => {
-  //   try {
-  //     if (isLoadMore) {
-  //       setLoadingMore(true);
-  //     } else {
-  //       setLoading(true);
-  //     }
-
-  //     console.log(`Fetching chats for page ${pageNum}, isLoadMore: ${isLoadMore}`);
-      
-  //     const response = await fetch(
-  //       `${API_URL}/employee/chats?page=${pageNum}&limit=${PAGE_SIZE}`,
-  //       {
-  //         headers: {
-  //           'Authorization': `Bearer ${accessToken}`,
-  //         },
-  //       }
-  //     );
-      
-  //     if (!response.ok) {
-  //       console.error('Failed to fetch chats:', response.status, response.statusText);
-  //       throw new Error('Failed to fetch chats');
-  //     }
-
-  //     const data: ChatResponse = await response.json();
-  //     console.log('Received chat data:', data);
-      
-  //     if (isLoadMore) {
-  //       setChats(prevChats => {
-  //         const uniqueChats = data.chats.filter(
-  //           newChat => !prevChats.some(existingChat => existingChat.chat_id === newChat.chat_id)
-  //         );
-  //         return [...prevChats, ...uniqueChats];
-  //       });
-  //     } else {
-  //       setChats(data.chats);
-  //     }
-
-  //     setHasMore(data.chats.length >= PAGE_SIZE);
-  //     setPage(pageNum);
-  //   } catch (error) {
-  //     console.error('Error fetching chats:', error);
-  //   } finally {
-  //     setLoading(false);
-  //     setLoadingMore(false);
-  //   }
-  // };
 
   const fetchNotifications = async (pageNum: number, isLoadMore = false) => {
     try {
@@ -603,8 +555,16 @@ export default function HomeScreen() {
       currentSessionStatus = session.status || "inactive";
     }
     
+    // Make sure chainId is included in the context
+    const updatedContext = {
+      ...context,
+      chainId: context.chainId || context.chainId // Use the chainId provided in context
+    };
+    
+    console.log('Opening chat with context:', updatedContext);
+    
     setSelectedChatId(chatId);
-    setSelectedChainContext(context); // New state for chain context
+    setSelectedChainContext(updatedContext); // Pass the updated context with chainId
     setIsChatVisible(true);
     
     // Animate from 0 to 1
@@ -617,15 +577,21 @@ export default function HomeScreen() {
   };
 
   useEffect(() => {
-    fetchNotifications(1, true);
-    fetchProfile();
+    // Initialize data...
+    // loadChats('');  
     fetchScheduledSessions();
+    fetchProfile();
+    loadChains();
+    fetchNotifications(1, true);
     
     const interval = setInterval(() => {
+      // loadChats('');
       fetchNotifications(1, true);
-    }, 15000); 
+    }, 60000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+    };
   }, []);
 
   // Add new useEffect for page changes - only ping API
@@ -667,32 +633,17 @@ export default function HomeScreen() {
     }
   };
 
-  const showChat = (chatId?: string) => {
-    // If creating a new chat (no chatId), verify there are pending sessions
-    if (!chatId && !scheduledSessions.some(session => session.status === "pending")) {
-      // If no pending sessions, don't open chat
+  const showChat = (chatId: string) => {
+    if (!chatId) {
+      console.error('No chat ID provided to showChat');
       return;
     }
     
-    // Get the session status if it exists
-    let currentSessionStatus = "inactive"; 
-    if (chatId) {
-      const matchingSession = scheduledSessions.find(
-        session => session.chat_id === chatId
-      );
-      
-      if (matchingSession) {
-        currentSessionStatus = matchingSession.status;
-      }
-    }
+    console.log('Directly entering existing chat:', chatId);
     
-    if (chatId) {
+    // Set the chat ID
       setSelectedChatId(chatId);
       setIsFromRecentChat(true);
-    } else {
-      setSelectedChatId(undefined);
-      setIsFromRecentChat(false);
-    }
     
     // Make the chat visible
     setIsChatVisible(true);
@@ -758,396 +709,383 @@ export default function HomeScreen() {
     ? ['#2C5EE6', '#1A3A99', '#0A1E4D'] // Dark blue gradient
     : ['#E8F1FF', '#C8E1FF', '#A5D1FF']; // Light blue gradient
 
-  // Set up notification listeners
-  useEffect(() => {
-    // The listeners are already set up in the PushNotification.configure() call in utils/notifications.ts
-    // Here we can add app-specific behavior for when notifications are received
-
-    try {
-      // Get initial notification that opened the app - safely
-      PushNotification.popInitialNotification((notification) => {
-        if (notification) {
-          console.log('Initial notification:', notification);
-          
-          // Handle the notification data
-          const data = notification.data || {};
-          
-          if (data.type === 'chat' && data.chatId) {
-            setSelectedChatId(data.chatId);
-            showChat(data.chatId);
-          } else if (data.type === 'chain' && data.chainId) {
-            toggleChainExpand(data.chainId);
-          }
-        }
-      });
-    } catch (error) {
-      console.error('Error handling initial notification:', error);
-    }
-
-    // This is used to remove any listeners
-    return () => {
-      // Cleanup is handled by the PushNotification library internally
-    };
-  }, []);
-
-  // Demo function to send a test notification
-  const sendTestNotification = async () => {
-    if (!profile) return;
-    
-    await scheduleNotification(
-      'New message received',
-      `You have a new message in your inbox`,
-      { type: 'chat', employeeId: profile.employee_id }
-    );
-  };
-
-  // Add a new function for directly entering an existing chat
-  const enterChat = (chatId: string) => {
-    if (!chatId) {
-      console.error('No chat ID provided to enterChat');
-      return;
-    }
-    
-    console.log('Directly entering existing chat:', chatId);
-    
-    // Set the chat ID
-    setSelectedChatId(chatId);
-    setIsFromRecentChat(true);
-    
-    // Make the chat visible
-    setIsChatVisible(true);
-    
-    // Animate from 0 to 1
-    Animated.spring(chatAnimation, {
-      toValue: 1,
-      useNativeDriver: false,
-      tension: 80,
-      friction: 12,
-    }).start();
-  };
-
   // Add View Chain Details button to chain items
   const renderChainItem = ({ chain }: { chain: ChainItem }) => {
-    const isExpanded = expandedChains.has(chain.chain_id);
-    return (
-      <View key={chain.chain_id} style={styles.chainContainer}>
-        <TouchableOpacity 
+                  const isExpanded = expandedChains.has(chain.chain_id);
+                  return (
+                    <View key={chain.chain_id} style={styles.chainContainer}>
+                      <TouchableOpacity 
           onPress={() => toggleChainExpand(chain.chain_id)}
-          style={[
-            styles.recentChainItem,
-            { 
-              backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.8)',
-              borderLeftWidth: 5,
-              borderLeftColor: chain.status === 'active' 
-                ? '#4CAF50' // Green for active
-                : chain.status === 'completed' 
-                  ? '#2C5EE6' // Blue for completed
-                  : '#FFC107', // Yellow for other statuses
-              borderBottomLeftRadius: isExpanded ? 0 : 8,
-              borderBottomRightRadius: isExpanded ? 0 : 8,
-            }
-          ]}
-        >
-          <View style={styles.recentChainHeader}>
-            <View style={styles.recentChainTitleContainer}>
-              <Ionicons 
-                name={chain.status === 'active' ? "ellipse" : "checkmark-circle"} 
-                size={16} 
-                color={chain.status === 'active' ? '#4CAF50' : '#2C5EE6'} 
-                style={{ marginRight: 8 }}
-              />
-              <Text style={[
-                styles.recentChainTitle, 
-                { color: isDarkMode ? 'white' : theme.COLORS.text.primary }
-              ]}>
-                Chain {chain.chain_id.substring(5, 11)}
-              </Text>
-            </View>
-            <View style={styles.expandIconContainer}>
-              <View style={[
-                styles.statusBadge, 
-                { 
-                  backgroundColor: chain.status === 'active' 
-                    ? 'rgba(76, 175, 80, 0.2)' // Light green for active
-                    : 'rgba(44, 94, 230, 0.2)', // Light blue for completed
-                  marginRight: 8
+                        style={[
+                          styles.recentChainItem,
+                          { 
+                            backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.8)',
+                            borderLeftWidth: 5,
+                            borderLeftColor: chain.status === 'active' 
+                              ? '#4CAF50' // Green for active
+                              : chain.status === 'completed' 
+                                ? '#2C5EE6' // Blue for completed
+                                : '#FFC107', // Yellow for other statuses
+                            borderBottomLeftRadius: isExpanded ? 0 : 8,
+                            borderBottomRightRadius: isExpanded ? 0 : 8,
+                          }
+                        ]}
+                      >
+                        <View style={styles.recentChainHeader}>
+                          <View style={styles.recentChainTitleContainer}>
+                            <Ionicons 
+                              name={chain.status === 'active' ? "ellipse" : "checkmark-circle"} 
+                              size={16} 
+                              color={chain.status === 'active' ? '#4CAF50' : '#2C5EE6'} 
+                              style={{ marginRight: 8 }}
+                            />
+                            <Text style={[
+                              styles.recentChainTitle, 
+                              { color: isDarkMode ? 'white' : theme.COLORS.text.primary }
+                            ]}>
+                              Chain {chain.chain_id.substring(5, 11)}
+                            </Text>
+                          </View>
+                          <View style={styles.expandIconContainer}>
+                            <View style={[
+                              styles.statusBadge, 
+                              { 
+                                backgroundColor: chain.status === 'active' 
+                                  ? 'rgba(76, 175, 80, 0.2)' // Light green for active
+                                  : 'rgba(44, 94, 230, 0.2)', // Light blue for completed
+                                marginRight: 8
                 }]}>
-                <Text style={[
-                  styles.statusText,
-                  { 
-                    color: chain.status === 'active' ? '#4CAF50' : '#2C5EE6',
-                    fontWeight: 'bold'
-                  }
-                ]}>
-                  {chain.status.charAt(0).toUpperCase() + chain.status.slice(1)}
-                </Text>
-              </View>
-              <Ionicons 
-                name={isExpanded ? "chevron-up" : "chevron-down"} 
-                size={20} 
-                color={isDarkMode ? 'rgba(255, 255, 255, 0.7)' : theme.COLORS.text.secondary} 
-              />
-            </View>
-          </View>
-          
-          <View style={styles.recentChainDetails}>
-            <Text style={[
-              styles.recentChainDate, 
-              { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }
-            ]}>
-              Created: {formatDate(chain.created_at)}
-            </Text>
-            
-            {chain.notes && (
-              <Text style={[
-                styles.recentChainNotes, 
-                { color: isDarkMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)' }
-              ]}>
-                Notes: {chain.notes}
-              </Text>
-            )}
-          </View>
-        </TouchableOpacity>
-        
-        {/* Display sessions when expanded */}
-        {isExpanded && (
-          <View style={[
-            styles.sessionsContainer, 
-            { 
-              backgroundColor: isDarkMode ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.6)',
-              borderBottomLeftRadius: 8,
-              borderBottomRightRadius: 8,
-            }
-          ]}>
-            {loadingChainMessages[chain.chain_id] ? (
-              // Show shimmer loading effect with proper theme support
-              <>
-                {chain.status === 'active' ? (
-                  // For active chains, randomly show either session shimmers or empty state for demo purposes
-                  Math.random() > 0.5 ? (
-                    // Show session shimmers
-                    [1, 2].map((index) => (
-                      <View key={`shimmer-${index}`} style={styles.sessionItem}>
-                        <View style={styles.sessionHeader}>
-                          <Shimmer 
-                            width={150} 
-                            height={16} 
-                            backgroundColor={isDarkMode ? 'rgba(70, 70, 70, 0.2)' : 'rgba(230, 230, 230, 0.5)'}
-                            highlightColor={isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.8)'}
-                          />
-                        </View>
-                        <View style={[
-                          styles.messageContainer,
-                          { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.6)', marginTop: verticalScale(8) }
-                        ]}>
-                          <Shimmer 
-                            width={80} 
-                            height={12} 
-                            style={{ marginBottom: 8 }} 
-                            backgroundColor={isDarkMode ? 'rgba(70, 70, 70, 0.2)' : 'rgba(230, 230, 230, 0.5)'}
-                            highlightColor={isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.8)'}
-                          />
-                          <Shimmer 
-                            width={250} 
-                            height={16} 
-                            style={{ marginBottom: 8 }} 
-                            backgroundColor={isDarkMode ? 'rgba(70, 70, 70, 0.2)' : 'rgba(230, 230, 230, 0.5)'}
-                            highlightColor={isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.8)'}
-                          />
-                          <Shimmer 
-                            width={80} 
-                            height={10} 
-                            style={{ alignSelf: 'flex-end' }} 
-                            backgroundColor={isDarkMode ? 'rgba(70, 70, 70, 0.2)' : 'rgba(230, 230, 230, 0.5)'}
-                            highlightColor={isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.8)'}
-                          />
-                        </View>
-                      </View>
-                    ))
-                  ) : (
-                    // Show empty state shimmer with button placeholder
-                    <View style={styles.emptySessionsContainer}>
-                      <Shimmer 
-                        width={200} 
-                        height={20} 
-                        style={{ marginBottom: verticalScale(16) }} 
-                        backgroundColor={isDarkMode ? 'rgba(70, 70, 70, 0.2)' : 'rgba(230, 230, 230, 0.5)'}
-                        highlightColor={isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.8)'}
-                      />
-                      <Shimmer 
-                        width={180} 
-                        height={40} 
-                        style={{ borderRadius: 8 }} 
-                        backgroundColor={isDarkMode ? 'rgba(44, 94, 230, 0.2)' : 'rgba(44, 94, 230, 0.1)'}
-                        highlightColor={isDarkMode ? 'rgba(44, 94, 230, 0.5)' : 'rgba(44, 94, 230, 0.3)'}
-                      />
-                    </View>
-                  )
-                ) : (
-                  // For completed chains, just show session shimmers
-                  [1, 2].map((index) => (
-                    <View key={`shimmer-${index}`} style={styles.sessionItem}>
-                      <View style={styles.sessionHeader}>
-                        <Shimmer 
-                          width={150} 
-                          height={16} 
-                          backgroundColor={isDarkMode ? 'rgba(70, 70, 70, 0.2)' : 'rgba(230, 230, 230, 0.5)'}
-                          highlightColor={isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.8)'}
-                        />
-                      </View>
-                      <View style={[
-                        styles.messageContainer,
-                        { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.6)', marginTop: verticalScale(8) }
-                      ]}>
-                        <Shimmer 
-                          width={80} 
-                          height={12} 
-                          style={{ marginBottom: 8 }} 
-                          backgroundColor={isDarkMode ? 'rgba(70, 70, 70, 0.2)' : 'rgba(230, 230, 230, 0.5)'}
-                          highlightColor={isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.8)'}
-                        />
-                        <Shimmer 
-                          width={250} 
-                          height={16} 
-                          style={{ marginBottom: 8 }} 
-                          backgroundColor={isDarkMode ? 'rgba(70, 70, 70, 0.2)' : 'rgba(230, 230, 230, 0.5)'}
-                          highlightColor={isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.8)'}
-                        />
-                        <Shimmer 
-                          width={80} 
-                          height={10} 
-                          style={{ alignSelf: 'flex-end' }} 
-                          backgroundColor={isDarkMode ? 'rgba(70, 70, 70, 0.2)' : 'rgba(230, 230, 230, 0.5)'}
-                          highlightColor={isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.8)'}
-                        />
-                      </View>
-                    </View>
-                  ))
-                )}
-              </>
-            ) : chainMessages[chain.chain_id]?.sessions && chainMessages[chain.chain_id]?.sessions.length > 0 ? (
-              // Render actual sessions if loaded
-              chainMessages[chain.chain_id].sessions.map((session: any) => {
-                // Get the last message from the session's messages array
-                const lastMessage = session.messages?.length > 0 
-                  ? session.messages[session.messages.length - 1] 
-                  : null;
-                const hasMessages = session.messages?.length > 0;
-                const isEscalated = session.is_escalated === true;
-                
-                return (
-                  <View 
-                    key={session.session_id}
-                    style={[
-                      styles.sessionItem, 
-                      { 
-                        backgroundColor: isDarkMode ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)',
-                        borderLeftWidth: 3,
-                        borderLeftColor: isEscalated 
-                          ? '#E74C3C' // Red for escalated
-                            : hasMessages 
-                              ? '#2C5EE6' // Blue for active with messages
-                              : '#4CAF50', // Green for no messages
-                      }
-                    ]}
-                  >
-                    <View style={styles.sessionContent}>
-                      <View style={styles.sessionHeader}>
-                        <Text style={[styles.sessionId, { color: isDarkMode ? 'rgba(255, 255, 255, 0.9)' : '#333' }]}>
-                          Session: {session.session_id}
-                        </Text>
-                        <View style={styles.sessionStatus}>
-                          {isEscalated && (
-                            <View style={[styles.statusBadge, { backgroundColor: 'rgba(231, 76, 60, 0.2)' }]}>
-                              <Text style={[styles.statusText, { color: '#E74C3C' }]}>Escalated</Text>
+                              <Text style={[
+                                styles.statusText,
+                                { 
+                                  color: chain.status === 'active' ? '#4CAF50' : '#2C5EE6',
+                                  fontWeight: 'bold'
+                                }
+                              ]}>
+                                {chain.status.charAt(0).toUpperCase() + chain.status.slice(1)}
+                              </Text>
                             </View>
+                            <Ionicons 
+                              name={isExpanded ? "chevron-up" : "chevron-down"} 
+                              size={20} 
+                              color={isDarkMode ? 'rgba(255, 255, 255, 0.7)' : theme.COLORS.text.secondary} 
+                            />
+                          </View>
+                        </View>
+                        
+                        <View style={styles.recentChainDetails}>
+                          <Text style={[
+                            styles.recentChainDate, 
+                            { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }
+                          ]}>
+                            Created: {formatDate(chain.created_at)}
+                          </Text>
+                          
+                          {chain.notes && (
+                            <Text style={[
+                              styles.recentChainNotes, 
+                              { color: isDarkMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)' }
+                            ]}>
+                              Notes: {chain.notes}
+                            </Text>
                           )}
                         </View>
-                      </View>
+                      </TouchableOpacity>
                       
-                      {hasMessages ? (
-                        // Show message preview for sessions with messages
+                      {/* Display sessions when expanded */}
+                      {isExpanded && (
                         <View style={[
-                          styles.messageContainer, 
-                          { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.6)' }
+                          styles.sessionsContainer, 
+                          { 
+                            backgroundColor: isDarkMode ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.6)',
+                            borderBottomLeftRadius: 8,
+                            borderBottomRightRadius: 8,
+                          }
                         ]}>
-                          <Text style={[styles.messageSender, { color: isDarkMode ? theme.COLORS.primary.main : theme.COLORS.primary.dark }]}>
-                            {lastMessage.sender === 'emp' ? 'You' : 
-                             lastMessage.sender === 'bot' ? 'Bot' : 
-                             lastMessage.sender === 'hr' ? 'HR' : 
-                             lastMessage.sender.charAt(0).toUpperCase() + lastMessage.sender.slice(1)}:
-                          </Text>
-                          <Text 
-                            style={[styles.messageText, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}
-                            numberOfLines={2}
-                          >
-                            {lastMessage.text}
-                          </Text>
-                          <Text style={[styles.messageTime, { color: isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }]}>
-                            {new Date(lastMessage.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </Text>
-                        </View>
-                      ) : (
-                        // Show placeholder for sessions with no messages
-                        <Text style={[styles.noMessageText, { color: isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }]}>
-                          No messages available
-                        </Text>
-                      )}
-                      
-                      {/* Action buttons based on session state */}
-                      <View style={styles.sessionActions}>
-                        {!hasMessages ? (
-                          // Show Initiate Session button for sessions with no messages
-                          <TouchableOpacity
-                            style={[styles.sessionActionButton, { backgroundColor: theme.COLORS.primary.main }]}
-                            onPress={() => {
-                              console.log('Initiating session:', session.session_id);
+                          {loadingChainMessages[chain.chain_id] ? (
+                            // Show shimmer loading effect with proper theme support
+                            <>
+                              {chain.status === 'active' ? (
+                                // For active chains, randomly show either session shimmers or empty state for demo purposes
+                                Math.random() > 0.5 ? (
+                                  // Show session shimmers
+                                  [1, 2].map((index) => (
+                                    <View key={`shimmer-${index}`} style={styles.sessionItem}>
+                                      <View style={styles.sessionHeader}>
+                                        <Shimmer 
+                                          width={150} 
+                                          height={16} 
+                                          backgroundColor={isDarkMode ? 'rgba(70, 70, 70, 0.2)' : 'rgba(230, 230, 230, 0.5)'}
+                                          highlightColor={isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.8)'}
+                                        />
+                                      </View>
+                                      <View style={[
+                                        styles.messageContainer,
+                                        { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.6)', marginTop: verticalScale(8) }
+                                      ]}>
+                                        <Shimmer 
+                                          width={80} 
+                                          height={12} 
+                                          style={{ marginBottom: 8 }} 
+                                          backgroundColor={isDarkMode ? 'rgba(70, 70, 70, 0.2)' : 'rgba(230, 230, 230, 0.5)'}
+                                          highlightColor={isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.8)'}
+                                        />
+                                        <Shimmer 
+                                          width={250} 
+                                          height={16} 
+                                          style={{ marginBottom: 8 }} 
+                                          backgroundColor={isDarkMode ? 'rgba(70, 70, 70, 0.2)' : 'rgba(230, 230, 230, 0.5)'}
+                                          highlightColor={isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.8)'}
+                                        />
+                                        <Shimmer 
+                                          width={80} 
+                                          height={10} 
+                                          style={{ alignSelf: 'flex-end' }} 
+                                          backgroundColor={isDarkMode ? 'rgba(70, 70, 70, 0.2)' : 'rgba(230, 230, 230, 0.5)'}
+                                          highlightColor={isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.8)'}
+                                        />
+                                      </View>
+                                    </View>
+                                  ))
+                                ) : (
+                                  // Show empty state shimmer with button placeholder
+                                  <View style={styles.emptySessionsContainer}>
+                                    <Shimmer 
+                                      width={200} 
+                                      height={20} 
+                                      style={{ marginBottom: verticalScale(16) }} 
+                                      backgroundColor={isDarkMode ? 'rgba(70, 70, 70, 0.2)' : 'rgba(230, 230, 230, 0.5)'}
+                                      highlightColor={isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.8)'}
+                                    />
+                                    <Shimmer 
+                                      width={180} 
+                                      height={40} 
+                                      style={{ borderRadius: 8 }} 
+                                      backgroundColor={isDarkMode ? 'rgba(44, 94, 230, 0.2)' : 'rgba(44, 94, 230, 0.1)'}
+                                      highlightColor={isDarkMode ? 'rgba(44, 94, 230, 0.5)' : 'rgba(44, 94, 230, 0.3)'}
+                                    />
+                                  </View>
+                                )
+                              ) : (
+                                // For completed chains, just show session shimmers
+                                [1, 2].map((index) => (
+                                  <View key={`shimmer-${index}`} style={styles.sessionItem}>
+                                    <View style={styles.sessionHeader}>
+                                      <Shimmer 
+                                        width={150} 
+                                        height={16} 
+                                        backgroundColor={isDarkMode ? 'rgba(70, 70, 70, 0.2)' : 'rgba(230, 230, 230, 0.5)'}
+                                        highlightColor={isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.8)'}
+                                      />
+                                    </View>
+                                    <View style={[
+                                      styles.messageContainer,
+                                      { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.6)', marginTop: verticalScale(8) }
+                                    ]}>
+                                      <Shimmer 
+                                        width={80} 
+                                        height={12} 
+                                        style={{ marginBottom: 8 }} 
+                                        backgroundColor={isDarkMode ? 'rgba(70, 70, 70, 0.2)' : 'rgba(230, 230, 230, 0.5)'}
+                                        highlightColor={isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.8)'}
+                                      />
+                                      <Shimmer 
+                                        width={250} 
+                                        height={16} 
+                                        style={{ marginBottom: 8 }} 
+                                        backgroundColor={isDarkMode ? 'rgba(70, 70, 70, 0.2)' : 'rgba(230, 230, 230, 0.5)'}
+                                        highlightColor={isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.8)'}
+                                      />
+                                      <Shimmer 
+                                        width={80} 
+                                        height={10} 
+                                        style={{ alignSelf: 'flex-end' }} 
+                                        backgroundColor={isDarkMode ? 'rgba(70, 70, 70, 0.2)' : 'rgba(230, 230, 230, 0.5)'}
+                                        highlightColor={isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.8)'}
+                                      />
+                                    </View>
+                                  </View>
+                                ))
+                              )}
+                            </>
+                          ) : chainMessages[chain.chain_id]?.sessions && chainMessages[chain.chain_id]?.sessions.length > 0 ? (
+                            // Render actual sessions if loaded
+                            chainMessages[chain.chain_id].sessions.map((session: any) => {
+                              // Get the last message from the session's messages array
+                              const lastMessage = session.messages?.length > 0 
+                                ? session.messages[session.messages.length - 1] 
+                                : null;
+                              const hasMessages = session.messages?.length > 0;
+                              const isEscalated = session.is_escalated === true;
+                              
+                              return (
+                                <View 
+                                  key={session.session_id}
+                                  style={[
+                                    styles.sessionItem, 
+                                    { 
+                                      backgroundColor: isDarkMode ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.05)',
+                                      borderLeftWidth: 3,
+                                      borderLeftColor: isEscalated 
+                                        ? '#E74C3C' // Red for escalated
+                                          : hasMessages 
+                                            ? '#2C5EE6' // Blue for active with messages
+                                            : '#4CAF50', // Green for no messages
+                                    }
+                                  ]}
+                                >
+                                  <View style={styles.sessionContent}>
+                                    <View style={styles.sessionHeader}>
+                                      <Text style={[styles.sessionId, { color: isDarkMode ? 'rgba(255, 255, 255, 0.9)' : '#333' }]}>
+                                        Session: {session.session_id}
+                                      </Text>
+                                      <View style={styles.sessionStatus}>
+                                        {isEscalated && (
+                                          <View style={[styles.statusBadge, { backgroundColor: 'rgba(231, 76, 60, 0.2)' }]}>
+                                            <Text style={[styles.statusText, { color: '#E74C3C' }]}>Escalated</Text>
+                                          </View>
+                                        )}
+                                      </View>
+                                    </View>
+                                    
+                                    {hasMessages ? (
+                                      // Show message preview for sessions with messages
+                                      <View style={[
+                                        styles.messageContainer, 
+                                        { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.6)' }
+                                      ]}>
+                                        <Text style={[styles.messageSender, { color: isDarkMode ? theme.COLORS.primary.main : theme.COLORS.primary.dark }]}>
+                                          {lastMessage.sender === 'emp' ? 'You' : 
+                                           lastMessage.sender === 'bot' ? 'Bot' : 
+                                           lastMessage.sender === 'hr' ? 'HR' : 
+                                           lastMessage.sender.charAt(0).toUpperCase() + lastMessage.sender.slice(1)}:
+                                        </Text>
+                                        <Text 
+                                          style={[styles.messageText, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}
+                                          numberOfLines={2}
+                                        >
+                                          {lastMessage.text}
+                                        </Text>
+                                        <Text style={[styles.messageTime, { color: isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }]}>
+                                          {new Date(lastMessage.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </Text>
+                                      </View>
+                                    ) : (
+                                      // Show placeholder for sessions with no messages
+                                      <Text style={[styles.noMessageText, { color: isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }]}>
+                                        No messages available
+                                      </Text>
+                                    )}
+                                    
+                                    {/* Action buttons based on session state */}
+                                    <View style={styles.sessionActions}>
+                                      {!hasMessages ? (
+                                        // Show Initiate Session button for sessions with no messages
+                                        <TouchableOpacity
+                                          style={[styles.sessionActionButton, { backgroundColor: theme.COLORS.primary.main }]}
+                                          onPress={() => {
+                                            console.log('Initiating session:', session.session_id);
                               initiateChat(session.chat_id);
-                            }}
-                          >
-                            <Text style={styles.sessionActionButtonText}>Initiate Session</Text>
-                          </TouchableOpacity>
-                        ) : !isEscalated ? (
-                          // Show Enter Chat button for sessions with messages but not escalated
-                          <TouchableOpacity
-                            style={[styles.sessionActionButton, { backgroundColor: '#2C5EE6' }]}
-                            onPress={() => {
-                              console.log('Entering chat for session:', session.session_id);
-                              enterChat(session.chat_id);
-                            }}
-                          >
-                            <Text style={styles.sessionActionButtonText}>Enter Chat</Text>
-                          </TouchableOpacity>
-                        ) : null}
-                      </View>
-                    </View>
-                  </View>
-                );
-              })
-            ) : (
-              <View style={styles.emptySessionsContainer}>
-                <Text style={[styles.noMessageText, { padding: moderateScale(16), textAlign: 'center' }]}>
-                  No sessions found
-                </Text>
-                {/* Add Initiate New Session button for chains with no sessions */}
-                {chain.status === 'active' && (
-                  <TouchableOpacity
-                    style={[styles.createSessionButton, { backgroundColor: theme.COLORS.primary.main }]}
+                                          }}
+                                        >
+                                          <Text style={styles.sessionActionButtonText}>Initiate Session</Text>
+                                        </TouchableOpacity>
+                                      ) : !isEscalated ? (
+                                        // Show Enter Chat button for sessions with messages but not escalated
+                                        <TouchableOpacity
+                                          style={[styles.sessionActionButton, { backgroundColor: '#2C5EE6' }]}
+                                          onPress={() => {
+                                            console.log('Entering chat for session:', session.session_id);
+                                            showChat(session.chat_id);
+                                          }}
+                                        >
+                                          <Text style={styles.sessionActionButtonText}>Enter Chat</Text>
+                                        </TouchableOpacity>
+                                      ) : null}
+                                    </View>
+                                  </View>
+                                </View>
+                              );
+                            })
+                          ) : (
+                            <View style={styles.emptySessionsContainer}>
+                              <Text style={[styles.noMessageText, { padding: moderateScale(16), textAlign: 'center' }]}>
+                                No sessions found
+                              </Text>
+                              {/* Add Initiate New Session button for chains with no sessions */}
+                              {chain.status === 'active' && (
+                                <TouchableOpacity
+                                  style={[styles.createSessionButton, { backgroundColor: theme.COLORS.primary.main }]}
                     onPress={() => {
                       console.log('Initiating new session for chain:', chain.chain_id);
                       initiateChat(null, chain.chain_id);
-                    }}
-                  >
-                    <Ionicons name="add-circle-outline" size={16} color="white" style={{marginRight: 8}} />
-                    <Text style={styles.createSessionButtonText}>Initiate New Session</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
-          </View>
-        )}
+                                  }}
+                                >
+                                  <Ionicons name="add-circle-outline" size={16} color="white" style={{marginRight: 8}} />
+                                  <Text style={styles.createSessionButtonText}>Initiate New Session</Text>
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          )}
+                        </View>
+                      )}
       </View>
     );
+  };
+
+  // const loadChats = async (chain_id: string) => {
+  //   try {
+  //     setLoading(true);
+      
+  //     const response = await fetch(
+  //       `${API_URL}/employee/chains/${chain_id}?page=${page}&limit=${PAGE_SIZE}`,
+  //       {
+  //         headers: {
+  //           'Authorization': `Bearer ${accessToken}`,
+  //         },
+  //       }
+  //     );
+      
+  //     if (!response.ok) {
+  //       console.error('Failed to fetch chats:', response.status, response.statusText);
+  //       throw new Error('Failed to fetch chats');
+  //     }
+
+  //     const data: ChatResponse = await response.json();
+      
+  //     setChats(data.chats);
+  //     setHasMore(data.chats.length >= PAGE_SIZE);
+  //     setPage(1);
+  //   } catch (error) {
+  //     console.error('Error fetching chats:', error);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
+  const loadChains = async () => {
+    if (!accessToken) return;
+    
+    try {
+      setChainsLoading(true);
+      
+      const response = await fetch(`${API_URL}/employee/chains`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch chains');
+      }
+
+      const data = await response.json();
+      setChains(data.chains || []);
+                                    } catch (error) {
+      console.error('Error fetching chains:', error);
+                                    } finally {
+      setChainsLoading(false);
+    }
   };
 
   return (
@@ -1309,8 +1247,8 @@ export default function HomeScreen() {
                       <Text style={[styles.updateSubtext, { color: isDarkMode ? 'rgba(255, 255, 255, 0.5)' : theme.COLORS.text.secondary }]}>
                         {profile.company_data.performance[0].Manager_Feedback}
                       </Text>
-                    </View>
-                  )}
+                            </View>
+                          )}
 
                   {/* Latest Activity */}
                   {profile.company_data.activity.length > 0 && (
@@ -1325,8 +1263,8 @@ export default function HomeScreen() {
                       <Text style={[styles.updateSubtext, { color: isDarkMode ? 'rgba(255, 255, 255, 0.5)' : theme.COLORS.text.secondary }]}>
                         {profile.company_data.activity[0].Meetings_Attended} meetings
                       </Text>
-                    </View>
-                  )}
+                        </View>
+                      )}
                 </>
               ) : null}
             </View>

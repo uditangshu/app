@@ -1,8 +1,12 @@
 import { ExpoConfig, ConfigContext } from 'expo/config';
 
+// Get environment variables
+const APP_ENV = process.env.APP_ENV || 'development';
+const isProduction = APP_ENV === 'production';
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: 'Employee Portal',
+  name: isProduction ? 'Employee Portal' : 'Employee Portal (Dev)',
   slug: 'employee-app',
   version: '1.0.0',
   orientation: 'portrait',
@@ -18,9 +22,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ],
   ios: {
     supportsTablet: true,
-    bundleIdentifier: 'com.yourcompany.employeeportal',
+    bundleIdentifier: 'com.yourcompany.employeeapp',
+    buildNumber: '1.0.0',
     infoPlist: {
-      ITSAppUsesNonExemptEncryption: false
+      ITSAppUsesNonExemptEncryption: false,
     }
   },
   android: {
@@ -28,17 +33,27 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       foregroundImage: './assets/Dlogo.png',
       backgroundColor: '#000000'
     },
-    package: 'com.yourcompany.employeeportal'
+    package: isProduction ? 
+      'com.yourcompany.employeeportal' : 
+      'com.yourcompany.employeeportal.dev',
+    permissions: ["RECORD_AUDIO"]
   },
   web: {
     favicon: './assets/favicon.png'
   },
   plugins: [
-    'expo-router'
+    'expo-router',
   ],
   extra: {
     eas: {
-      projectId: "9ca63f10-a469-4f83-a906-b288c088e0c8"
-    }
+      projectId: "3161714f-2328-47b7-93c2-bcc729042808"
+    },
+    appEnv: APP_ENV
+  },
+  updates: {
+    url: 'https://u.expo.dev/3161714f-2328-47b7-93c2-bcc729042808'
+  },
+  runtimeVersion: {
+    policy: 'sdkVersion'
   }
-}); 
+});

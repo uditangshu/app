@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, createRef } from 'react';
+import React, { useState, useRef, useEffect, createRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,8 @@ import {
   ToastAndroid,
   ScrollView,
   PermissionsAndroid,
+  Alert,
+  SectionList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -50,6 +52,7 @@ interface Message {
   sender?: string;
   sessionStatus?: string;
   chainStatus?: string;
+  can_end_chat?: boolean;
 }
 
 interface ChatHistory {
@@ -104,6 +107,17 @@ interface ChatScreenProps {
   sessionStatus?: string;
 }
 
+// Define an interface for session objects
+interface SessionItem {
+  session_id: string;
+  chat_id?: string;
+  created_at?: string;
+  status?: string;
+  notes?: string;
+  last_message?: string;
+  [key: string]: any; // Allow for additional properties
+}
+
 export default function ChatScreen({ 
   onClose, 
   initialChatId, 
@@ -144,6 +158,12 @@ export default function ChatScreen({
 
   // Add a new state variable to track session status from messages
   const [messageSessionStatus, setMessageSessionStatus] = useState<string | null>(null);
+
+  // Add a new state variable to track whether the input should be enabled or disabled
+  const [canEndChat, setCanEndChat] = useState<boolean>(false);
+
+  // Add state to track current chain_id
+  const [chainId, setChainId] = useState('');
 
   // Add an effect to update the session status from messages
   useEffect(() => {
@@ -383,6 +403,7 @@ export default function ChatScreen({
 
       if (!pendingSession) {
         console.error('No pending sessions available');
+        setIsLoading(false);
         return;
       }
 
@@ -393,30 +414,58 @@ export default function ChatScreen({
           'Authorization': `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
-          chatId: "string",
+          chatId: pendingSession.chat_id,
           status: "bot"
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to initiate chat');
+        throw new Error(`Failed to initiate chat: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('Chat initiated:', data);
+      console.log('Initiate chat response:', data);
       
-      // If successful, set the new chat ID
-      if (data) {
-        setSelectedChatId(data);
-        // Also refresh chat history
-        fetchChatHistory();
+      // Set the chat ID from the response if it exists, otherwise use the pending session's chat ID
+      const chatId = data.chatId || pendingSession.chat_id;
+      setSelectedChatId(chatId);
+      
+      // Important: Update session status to ensure input is enabled
+      setMessageSessionStatus('active');
+      
+      // If the API response included a message, add it to the chat
+      if (data.message) {
+        const botMessage: Message = {
+          id: Date.now().toString(),
+          text: data.message,
+          isUser: false,
+          timestamp: new Date(),
+          sender: 'bot',
+          sessionStatus: data.sessionStatus || 'active',
+          chainStatus: data.chainStatus,
+          can_end_chat: data.can_end_chat
+        };
+        
+        setMessages([botMessage]);
       }
+      
+      // Load any existing messages after initiation
+      // await loadChatMessages(chatId);
+      
     } catch (error) {
       console.error('Error initiating chat:', error);
-      const shouldRetry = await handleAuthError(error);
-      if (shouldRetry) {
-        initiateChat();
-      }
+      
+      // Show error message
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        text: 'Failed to initiate chat. Please try again.',
+        isUser: false,
+        timestamp: new Date(),
+        sender: 'system',
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+      
     } finally {
       setIsLoading(false);
     }
@@ -481,31 +530,87 @@ export default function ChatScreen({
     return false;
   };
 
-  const fetchChatHistory = async () => {
+  // Replace the fetchChatHistory function to correctly handle the API format 
+  const fetchChatHistory = async (chainIdParam = chainId) => {
     if (!accessToken) {
       console.error('No access token available');
       return;
     }
 
+    // Use chainId from chainContext if available
+    let chainIdToUse = chainIdParam;
+    if (chainContext && chainContext.chainId) {
+      console.log('Using chainId from chainContext:', chainContext.chainId);
+      chainIdToUse = chainContext.chainId;
+    }
+    
+    // If chainIdParam is empty or 'default', use a different endpoint
+    const isDefaultChain = !chainIdToUse || chainIdToUse === '';
+    const endpoint = isDefaultChain 
+      ? `${API_URL}/employee/chats` // Use the general chats endpoint for the default case
+      : `${API_URL}/employee/chains/${chainIdToUse}`;
+    
+    console.log(`Fetching chat history from: ${endpoint}`);
+    
     try {
-      const response = await fetch(`${API_URL}/employee/chats`, {
+      // Make the API request
+      const response = await fetch(endpoint, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
+          'Accept': 'application/json'
         },
       });
 
       if (!response.ok) {
+        console.error(`Failed to fetch chat history: ${response.status} ${response.statusText}`);
         throw new Error('Failed to fetch chat history');
       }
 
       const data = await response.json();
-      setChatHistory(data.chats);
+      console.log('API response data:', data);
+      
+      if (isDefaultChain) {
+        // If we used the default endpoint, format is different (list of chats)
+        console.log('Setting chat history with general chats data');
+        setChatHistory(Array.isArray(data) ? data : []);
+        // Clear chain sessions when viewing general chats
+        setChainSessions([]);
+      } else {
+        // Handle the chain-specific response format 
+        if (data.session_ids && Array.isArray(data.session_ids)) {
+          console.log('Chain sessions received:', data.session_ids);
+          
+          // Process sessions for the chain view
+          const sessions = data.session_ids.map((sessionId: string) => ({
+            session_id: sessionId,
+            chat_id: sessionId,
+            created_at: new Date().toISOString(),
+            status: 'active',
+            notes: `Session ${sessionId}`,
+            last_message: `Chain session ${sessionId}`
+          }));
+          
+          console.log('Setting chain sessions:', sessions.length);
+          setChainSessions(sessions);
+          
+          // Clear regular chat history when viewing chain
+          setChatHistory([]);
+        } else if (data.chats && Array.isArray(data.chats)) {
+          // Some chains might return chats directly
+          console.log('Chain returned chat list');
+          setChatHistory(data.chats);
+          setChainSessions([]);
+        } else {
+          console.log('No valid data in chain response, clearing history');
+          setChatHistory([]);
+          setChainSessions([]);
+        }
+      }
     } catch (error) {
       console.error('Error fetching chat history:', error);
-      const shouldRetry = await handleAuthError(error);
-      if (shouldRetry) {
-        fetchChatHistory();
-      }
+      // Clear data on error
+      setChatHistory([]);
+      setChainSessions([]);
     }
   };
 
@@ -609,48 +714,68 @@ export default function ChatScreen({
     }
   };
 
+  // Handle selecting a chat from the sidebar
   const handleChatSelect = async (chatId: string) => {
+    console.log('Selected chat:', chatId);
+    
+    // If we have a chat context with chain information, try to find which chain this belongs to
+    if (chainContext && chainContext.chainId) {
+      // We're already in a specific chain view
+      setSelectedChatId(chatId);
+      loadChatMessages(chatId);
+      setIsSidebarOpen(false);
+      return;
+    }
+    
+    // First, set this as the selected chat
     setSelectedChatId(chatId);
-    setIsSidebarOpen(false);
     
-    if (chainContext) {
-      // For chain views, don't show it as an "active session"
-      setActiveSession(null);
+    // Start loading messages
+    loadChatMessages(chatId);
+    
+    try {
+      // Attempt to find which chain this chat/session belongs to
+      console.log(`Checking which chain chat ${chatId} belongs to`);
+      const response = await fetch(`${API_URL}/employee/session/${chatId}/chain`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Accept': 'application/json'
+        },
+      });
       
-      // But still get the session ID for scrolling
-      const selectedSession = chainSessions.find(session => session.chat_id === chatId);
-      if (selectedSession && selectedSession.session_id) {
-        // Scroll to the selected session
-        scrollToSession(selectedSession.session_id);
-      }
-    } else {
-      // Original code for non-chain chats
-    if (accessToken) {
-      try {
-        const response = await fetch(`${API_URL}/employee/scheduled-sessions`, {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-          },
-        });
-
-        if (response.ok) {
-          const sessions = await response.json();
-          const matchingSession = sessions.find(
-            (session: ScheduledSession) => 
-              session.chat_id === chatId && 
-              session.status === 'pending'
-          );
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`Chain data for chat ${chatId}:`, data);
+        
+        if (data && data.chain_id && data.chain_id !== 'default') {
+          console.log(`Chat ${chatId} belongs to chain ${data.chain_id}`);
           
-          setActiveSession(matchingSession || null);
+          // Set the chain_id state to update UI
+          setChainId(data.chain_id);
+          
+          // Fetch chat history for this specific chain
+          fetchChatHistory(data.chain_id);
+        } else {
+          console.log(`No valid chain_id found for chat ${chatId}, using general chat list`);
+          // Reset to empty string instead of 'default' to use the general chats endpoint
+          setChainId('');
+          fetchChatHistory('');
         }
-      } catch (error) {
-        console.error('Error checking session for chat:', error);
-        setActiveSession(null);
+      } else {
+        console.log(`API returned ${response.status} when fetching chain for chat ${chatId}`);
+        // Reset to empty string instead of 'default'
+        setChainId('');
+        fetchChatHistory('');
       }
+    } catch (error) {
+      console.error('Error fetching chain for session:', error);
+      // Reset to empty string instead of 'default'
+      setChainId('');
+      fetchChatHistory('');
     }
     
-    await loadChatMessages(chatId);
-    }
+    // Close the sidebar regardless of the outcome
+    setIsSidebarOpen(false);
   };
 
   const sendMessage = async () => {
@@ -736,7 +861,8 @@ export default function ChatScreen({
         timestamp: new Date(),
         sender: 'bot',
         sessionStatus: data.sessionStatus,
-        chainStatus: data.chainStatus
+        chainStatus: data.chainStatus,
+        can_end_chat: data.can_end_chat
       };
       
       // Update messages state with the new bot message
@@ -800,17 +926,48 @@ export default function ChatScreen({
   };
 
   const loadAllChainMessages = async () => {
-    if (!chainContext || !accessToken) return;
-    
-    setIsLoading(true);
-    const allSessionMessages: {[key: string]: Message[]} = {};
-    const combinedMessages: Message[] = [];
-    
+    if (!chainContext || !chainContext.allSessions || chainContext.allSessions.length === 0) {
+      return;
+    }
+
     try {
-    
-      for (let i = 0; i < chainContext.allSessions.length; i++) {
-        const session = chainContext.allSessions[i];
-        const isLastSession = i === chainContext.allSessions.length - 1;
+      setIsLoading(true);
+      const allSessionMessages: { [key: string]: Message[] } = {};
+      const combinedMessages: Message[] = [];
+      const chainSessions = chainContext.allSessions;
+      
+      // Sort sessions by creation date in ascending order (oldest first)
+      const sortedSessions = [...chainSessions].sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+      
+      for (let i = 0; i < sortedSessions.length; i++) {
+        const session = sortedSessions[i];
+        const isLastSession = i === sortedSessions.length - 1;
+        
+        // Add a session marker at the BEGINNING of each session
+        const sessionDate = new Date(session.created_at || Date.now());
+        const formattedDate = sessionDate.toLocaleDateString(undefined, { 
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long', 
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        
+        // Add session divider before messages
+        const sessionMarker: Message = {
+          id: `session-marker-${session.session_id}-${i}-${Date.now()}`,
+          text: `Session started: ${formattedDate}`,
+          isUser: false,
+          timestamp: sessionDate,
+          isSessionMarker: true,
+          sessionId: session.session_id,
+          sender: 'system'
+        };
+        
+        combinedMessages.push(sessionMarker);
         
         try {
           const response = await fetch(`${API_URL}/employee/chats/${session.chat_id}/messages`, {
@@ -842,26 +999,6 @@ export default function ChatScreen({
           
           allSessionMessages[session.session_id] = formattedMessages;
           combinedMessages.push(...formattedMessages);
-
-          // Add a session marker AFTER this session's messages IF this is not the last session
-          // if (!isLastSession && formattedMessages.length > 0) {
-          //   // Get the next session for the marker
-          //   const nextSession = chainContext.allSessions[i + 1];
-          //   const nextSessionDate = new Date(nextSession.created_at || Date.now());
-          //   const formattedDate = `${nextSessionDate.toLocaleDateString()} ${nextSessionDate.toLocaleTimeString()}`;
-            
-          //   const sessionMarker: Message = {
-          //     id: `session-marker-${session.session_id}-${i}-${Date.now()}`,
-          //     text: `New Session Starting: ${formattedDate}`,
-          //     isUser: false,
-          //     timestamp: nextSessionDate,
-          //     isSessionMarker: true,
-          //     sessionId: nextSession.session_id,
-          //     sender: 'system'
-          //   };
-            
-          //   combinedMessages.push(sessionMarker);
-          // }
         } catch (error) {
           console.error(`Error loading messages for session ${session.session_id}:`, error);
         }
@@ -919,11 +1056,21 @@ export default function ChatScreen({
     const ref = item.isSessionMarker && item.sessionId ? 
       sessionRefs.current[item.sessionId] : null;
     
+    // Determine if this message starts a new session (compare with previous message)
+    // Add safety checks to avoid the "Cannot read properties of undefined" error
+    const isNewSession = index > 0 && 
+                        item.sessionId && 
+                        allMessages && 
+                        allMessages[index - 1] && 
+                        allMessages[index - 1].sessionId && 
+                        item.sessionId !== allMessages[index - 1].sessionId && 
+                        !item.isSessionMarker;
+    
     return (
       <View 
         ref={ref || undefined}
         style={[
-      styles.messageContainer,
+          styles.messageContainer,
           item.isSessionMarker && [
             styles.sessionMarker,
             { backgroundColor: isDarkMode ? 'rgba(44, 94, 230, 0.2)' : 'rgba(44, 94, 230, 0.15)' }
@@ -934,9 +1081,25 @@ export default function ChatScreen({
           }
         ]}
       >
+        {/* If we detect a new session without a session marker, add a light divider */}
+        {isNewSession && (
+          <View style={{
+            height: 1,
+            backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+            width: '300%',  // Make it extend beyond the message bubble
+            alignSelf: 'center',
+            marginVertical: 12,
+            position: 'relative',
+            left: '-100%'  // Center it
+          }} />
+        )}
+        
         {item.isSessionMarker ? (
           <>
-            <View style={[styles.divider, { height: 2, backgroundColor: 'rgba(44, 94, 230, 0.4)' }]} />
+            <View style={[styles.divider, { 
+              height: 2, 
+              backgroundColor: isDarkMode ? 'rgba(44, 94, 230, 0.5)' : 'rgba(44, 94, 230, 0.4)'
+            }]} />
             
             <View style={styles.sessionMarkerContent}>
               <Ionicons name="time-outline" size={24} color={theme.COLORS.primary.main} />
@@ -961,10 +1124,29 @@ export default function ChatScreen({
               </View>
             </View>
             
-            <View style={[styles.divider, { height: 2, backgroundColor: 'rgba(44, 94, 230, 0.4)' }]} />
+            <View style={[styles.divider, { 
+              height: 2, 
+              backgroundColor: isDarkMode ? 'rgba(44, 94, 230, 0.5)' : 'rgba(44, 94, 230, 0.4)'
+            }]} />
           </>
         ) : (
           <>
+            {/* Show session ID badge if first message of a session or after a different session */}
+            {isNewSession && item.sessionId && (
+              <Text style={{
+                fontSize: fontScale(10),
+                backgroundColor: isDarkMode ? 'rgba(44, 94, 230, 0.3)' : 'rgba(44, 94, 230, 0.15)',
+                color: isDarkMode ? 'rgba(255,255,255,0.8)' : theme.COLORS.primary.main,
+                paddingHorizontal: 6,
+                paddingVertical: 2,
+                borderRadius: 4,
+                alignSelf: 'flex-start',
+                marginBottom: 6
+              }}>
+                Session: {item.sessionId.substring(0, 8)}
+              </Text>
+            )}
+            
             {/* Only show sender label for non-user messages, avoid showing it twice */}
             {!item.isUser && item.sender && (
               <Text style={{
@@ -1006,19 +1188,21 @@ export default function ChatScreen({
                 borderLeftColor: isDarkMode ? '#ff6666' : '#cc0000'
               } : {}
             ]}>
-        <Text style={[
-          styles.messageText, 
-          { 
-            color: item.isUser ? "#ffffff" : (isDarkMode ? 'rgba(255, 255, 255, 0.95)' : '#333333'),
-            fontStyle: item.isSystemMessage ? 'italic' : 'normal',
-            fontWeight: item.text.includes('error') || item.text.includes('Error') ? '500' : 'normal'
-          }
-        ]}>
-          {item.text}
-        </Text>
+              <Text style={[
+                styles.messageText, 
+                { 
+                  color: item.isUser ? "#ffffff" : 
+                         item.sender === 'system' ? (isDarkMode ? 'rgba(255, 100, 100, 0.95)' : '#cc0000') :
+                         isDarkMode ? 'rgba(255, 255, 255, 0.95)' : '#333333',
+                  fontStyle: item.sender === 'system' ? 'italic' : 'normal',
+                  fontWeight: item.text.includes('error') || item.text.includes('Error') ? '500' : 'normal'
+                }
+              ]}>
+                {item.text}
+              </Text>
             </View>
-        <Text style={[
-          styles.timestamp,
+            <Text style={[
+              styles.timestamp,
               { 
                 color: item.isUser ? 'rgba(255,255,255,0.7)' : isDarkMode ? 'rgba(180,180,180,0.8)' : 'rgba(120,120,120,0.8)',
                 alignSelf: item.isUser ? 'flex-end' : 'flex-start',
@@ -1028,94 +1212,108 @@ export default function ChatScreen({
               }
             ]}>
               {item.timestamp.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', hour12: false})}
-        </Text>
+            </Text>
           </>
         )}
     </View>
   );
-  };
+};
 
-  const renderChatHistoryItem = ({ item }: { item: ChatItem }) => (
-    <TouchableOpacity
-      style={[
-        styles.chatHistoryItem,
-        selectedChatId === item.chat_id && styles.selectedChatItem,
-        { 
-          backgroundColor: selectedChatId === item.chat_id 
-            ? (isDarkMode ? 'rgba(44, 94, 230, 0.2)' : 'rgba(44, 94, 230, 0.15)') 
-            : (isDarkMode ? 'rgba(30, 40, 60, 0.3)' : 'rgba(0,0,0,0.03)'),
-          marginBottom: 8,
-          borderRadius: 10,
-          padding: moderateScale(12),
-          borderLeftWidth: selectedChatId === item.chat_id ? 3 : 0,
-          borderLeftColor: '#2C5EE6',
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: selectedChatId === item.chat_id ? 0.2 : 0,
-          shadowRadius: 2,
-          elevation: selectedChatId === item.chat_id ? 2 : 0,
-        }
-      ]}
-      onPress={() => handleChatSelect(item.chat_id)}
-    >
-      <View style={styles.chatHistoryContent}>
-        {/* Show session_id if in chain context and the item has one */}
-        {chainContext && item.session_id && (
-          <Text style={[
-            styles.sessionIdText, 
-            { 
-              color: theme.COLORS.primary.main,
-              fontSize: fontScale(13),
-              fontWeight: '600',
-              marginBottom: 4
-            }
-          ]}>
-            Session {item.session_id.substring(0, 8)}
-          </Text>
-        )}
-        <Text 
-          style={[
-            styles.chatHistoryMessage, 
-            { 
-              color: isDarkMode ? 'rgba(255,255,255,0.9)' : theme.COLORS.text.primary,
-              fontSize: fontScale(14),
-              fontWeight: selectedChatId === item.chat_id ? '500' : 'normal',
-              marginTop: 2
-            }
-          ]}
-          numberOfLines={2}
-        >
-          {item.last_message}
-        </Text>
-        {item.unread_count > 0 && (
-          <View style={[
-            styles.unreadBadge, 
-            { 
-              backgroundColor: theme.COLORS.primary.main,
-              borderRadius: 12,
-              minWidth: 24,
-              height: 24,
-              alignItems: 'center',
-              justifyContent: 'center',
-              paddingHorizontal: 5
-            }
-          ]}>
+  const renderChatHistoryItem = ({ item }: { item: ChatItem }) => {
+    // Check if this is a chain session item - if so, only display what we need
+    const isChainSession = chainContext && item.session_id !== undefined;
+    
+    return (
+      <TouchableOpacity
+        style={[
+          styles.chatHistoryItem,
+          selectedChatId === item.chat_id && styles.selectedChatItem,
+          { 
+            backgroundColor: selectedChatId === item.chat_id 
+              ? (isDarkMode ? 'rgba(44, 94, 230, 0.3)' : 'rgba(44, 94, 230, 0.15)') 
+              : (isDarkMode ? 'rgba(30, 40, 60, 0.3)' : 'rgba(0,0,0,0.03)'),
+            marginBottom: 8,
+            borderRadius: 10,
+            padding: moderateScale(12),
+            borderLeftWidth: selectedChatId === item.chat_id ? 3 : 0,
+            borderLeftColor: '#2C5EE6',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: selectedChatId === item.chat_id ? 0.2 : 0,
+            shadowRadius: 2,
+            elevation: selectedChatId === item.chat_id ? 2 : 0,
+          }
+        ]}
+        onPress={() => handleChatSelect(item.chat_id)}
+      >
+        <View style={styles.chatHistoryContent}>
+          {/* Show session_id if in chain context and the item has one */}
+          {isChainSession && item.session_id && (
             <Text style={[
-              styles.unreadCount,
-              {
-                color: theme.COLORS.background.paper,
-                fontSize: fontScale(12),
-                fontWeight: '600'
+              styles.sessionIdText, 
+              { 
+                color: isDarkMode ? '#ffffff' : theme.COLORS.primary.main,
+                fontSize: fontScale(13),
+                fontWeight: '600',
+                marginBottom: 4
               }
-            ]}>{item.unread_count}</Text>
-          </View>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
+            ]}>
+              Session {item.session_id.substring(0, 8)}
+            </Text>
+          )}
+          
+          <Text 
+            style={[
+              styles.chatHistoryMessage, 
+              { 
+                color: isDarkMode ? '#ffffff' : theme.COLORS.text.primary,
+                fontSize: fontScale(14),
+                fontWeight: selectedChatId === item.chat_id ? '500' : 'normal',
+                marginTop: 2
+              }
+            ]}
+            numberOfLines={2}
+          >
+            {isChainSession 
+              ? `Chat from ${new Date(item.last_message_time).toLocaleDateString()}`
+              : item.last_message}
+          </Text>
+          
+          {!isChainSession && item.unread_count > 0 && (
+            <View style={[
+              styles.unreadBadge, 
+              { 
+                backgroundColor: theme.COLORS.primary.main,
+                borderRadius: 12,
+                minWidth: 24,
+                height: 24,
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingHorizontal: 5
+              }
+            ]}>
+              <Text style={[
+                styles.unreadCount,
+                {
+                  color: theme.COLORS.background.paper,
+                  fontSize: fontScale(12),
+                  fontWeight: '600'
+                }
+              ]}>{item.unread_count}</Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   useEffect(() => {
     if (chainContext) {
+      console.log('Chain context provided:', chainContext);
+      if (chainContext.chainId) {
+        console.log('Setting chainId from chainContext:', chainContext.chainId);
+        setChainId(chainContext.chainId);
+      }
       loadAllChainMessages();
       // Don't set active session for chain context
       setActiveSession(null);
@@ -1137,10 +1335,21 @@ export default function ChatScreen({
     }
     
     if (!chainContext) {
-      fetchChatHistory();
+      fetchChatHistory(chainId); // Pass the chainId explicitly here
       fetchScheduledSessions();
+    } else {
+      // If we have chainContext, explicitly fetch history with the chainId from context
+      fetchChatHistory(chainContext.chainId);
     }
-  }, [initialChatId, scheduledSessions, chainContext]);
+  }, [initialChatId, scheduledSessions, chainContext, chainId]);
+
+  // Add a specific useEffect to handle chainId changes
+  useEffect(() => {
+    if (chainId && !chainContext) {
+      console.log(`Chain ID changed to ${chainId}, fetching new chat history`);
+      fetchChatHistory(chainId);
+    }
+  }, [chainId, chainContext, accessToken]);
 
   // Enhance the TypingIndicator for better visibility
   const TypingIndicator = () => {
@@ -1193,41 +1402,499 @@ export default function ChatScreen({
     setShowScrollToBottom(!isCloseToBottom);
   };
 
-  // Update the function to check if input should be enabled
+  // Updated canSendMessages function that checks message status AND chat end status
   const canSendMessages = () => {
-    // Debugging info
-    console.log("Session status checks:", {
-      sessionStatusProp: sessionStatus,
-      activeSessionStatus: activeSession?.status,
-      messageSessionStatus
-    });
+    // If readOnly prop is set, always return false
+    if (isReadOnly) {
+      return false;
+    }
+    
+    // First check session status from messages (most reliable & recent source)
+    if (messageSessionStatus === 'inactive') {
+      return false;
+    }
+    
+    // Then check prop session status
+    if (sessionStatus === 'inactive') {
+      return false;
+    }
+    
+    // Then check active session from state
+    if (activeSession?.status === 'inactive') {
+      return false;
+    }
+    
+    // If we have messages with can_end_chat flag, check it
+    const messagesWithCanEndChat = messages.filter(m => m.can_end_chat !== undefined);
+    if (messagesWithCanEndChat.length > 0) {
+      // Use the most recent message with can_end_chat flag
+      const latestMessage = messagesWithCanEndChat[messagesWithCanEndChat.length - 1];
+      // Update the state so we can reference it elsewhere
+      setCanEndChat(!!latestMessage.can_end_chat);
+    }
+    
+    // Default to true if no other conditions apply
+    return true;
+  };
 
-    // If any message has sessionStatus of active, allow sending
-    if (messageSessionStatus === 'active') {
-      console.log("Allowing messages because message sessionStatus is active");
-      return true;
+  const onSave = () => {
+    // ... Your save logic here ...
+  };
+
+  // Function to end the current chat session
+  const endChat = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Make API call to end session with the new endpoint
+      const response = await fetch(`${API_URL}/llm/chat/end-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({
+          chat_id: selectedChatId
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to end chat');
+      }
+      
+      // Update messages to show chat has ended
+      const endMessage: Message = {
+        id: `system-${Date.now()}`,
+        text: 'This chat has ended. You can start a new chat or view previous chats.',
+        timestamp: new Date(),
+        sender: 'system',
+        sessionStatus: 'inactive',
+        chainStatus: 'inactive',
+        isUser: false
+      };
+      
+      setMessages(prevMessages => [...prevMessages, endMessage]);
+      setMessageSessionStatus('inactive');
+      
+      // Show success toast
+      if (Platform.OS === 'android') {
+        ToastAndroid.show('Chat session ended successfully', ToastAndroid.SHORT);
+      } else {
+        Alert.alert('Success', 'Chat session ended successfully');
+      }
+      
+      // Close the chat modal after a short delay
+      setTimeout(() => {
+        onClose();
+      }, 1500);
+      
+    } catch (error) {
+      console.error('Error ending chat:', error);
+      Alert.alert(
+        'Failed to end chat',
+        'Please try again later'
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Add function to check if the chat has already ended
+  const isChatEnded = () => {
+    // Check for inactive status in messages
+    const hasInactiveStatus = messages.some(m => m.sessionStatus === 'inactive');
+    
+    // Check for system messages indicating the chat has ended
+    const hasEndMessage = messages.some(m => 
+      m.sender === 'system' && 
+      (m.text.includes('chat has ended') || m.text.includes('session has ended'))
+    );
+    
+    return hasInactiveStatus || hasEndMessage;
+  };
+  
+  // Update the check for the End Chat button to use this function
+  const shouldShowEndChatButton = () => {
+    // Remove the isReadOnly check since we'll handle that in the render
+    // Always show if there are any messages
+    return messages.length > 0;
+  };
+
+  // Process and group sessions by date for the sidebar
+  const processSessions = useCallback((sessions: SessionItem[] = []) => {
+    if (!sessions || !Array.isArray(sessions) || sessions.length === 0) return [];
+    
+    // Sort sessions by date (newest first)
+    const sortedSessions = [...sessions].sort((a, b) => {
+      const dateA = a.created_at ? new Date(a.created_at).getTime() : Date.now();
+      const dateB = b.created_at ? new Date(b.created_at).getTime() : Date.now();
+      return dateB - dateA;
+    });
+    
+    // Group by date
+    const sessionsByDate: {[key: string]: SessionItem[]} = {};
+    
+    sortedSessions.forEach(session => {
+      const date = session.created_at ? new Date(session.created_at) : new Date();
+      const dateKey = date.toDateString();
+      
+      if (!sessionsByDate[dateKey]) {
+        sessionsByDate[dateKey] = [];
+      }
+      
+      sessionsByDate[dateKey].push(session);
+    });
+    
+    // Convert to array format for SectionList
+    return Object.keys(sessionsByDate).map(date => ({
+      title: date,
+      data: sessionsByDate[date]
+    }));
+  }, []);
+
+  // Create the grouped sessions
+  const [groupedSessions, setGroupedSessions] = useState<any[]>([]);
+  
+  useEffect(() => {
+    if (chainContext) {
+      setGroupedSessions(processSessions());
+    }
+  }, [chainContext, processSessions]);
+
+  // Render a session date header in the sidebar
+  const renderSectionHeader = ({ section }: { section: { title: string } }) => {
+    const date = new Date(section.title);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    let displayDate = '';
+    if (date.toDateString() === today.toDateString()) {
+      displayDate = 'Today';
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      displayDate = 'Yesterday';
+    } else {
+      displayDate = date.toLocaleDateString(undefined, { 
+        weekday: 'short',
+        month: 'short', 
+        day: 'numeric' 
+      });
     }
     
-    // If session is explicitly marked as active via prop, allow sending
-    if (sessionStatus === 'active') {
-      console.log("Allowing messages because sessionStatus prop is active");
-      return true;
-    }
+    return (
+      <View style={[styles.sessionDateHeader, {
+        backgroundColor: isDarkMode ? 'rgba(30, 40, 60, 0.6)' : 'rgba(230, 240, 255, 0.8)',
+        paddingVertical: verticalScale(6),
+        paddingHorizontal: horizontalScale(12),
+        marginVertical: verticalScale(4),
+        borderRadius: 4,
+      }]}>
+        <Text style={{
+          color: isDarkMode ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 30, 100, 0.8)',
+          fontSize: fontScale(13),
+          fontWeight: '500',
+        }}>
+          {displayDate}
+        </Text>
+      </View>
+    );
+  };
+
+  // Replace the existing FlatList in the sidebar with a SectionList
+  const renderSidebar = () => {
+    console.log('Rendering sidebar with:', {
+      hasChainSessions: chainSessions && chainSessions.length > 0,
+      chainSessionsCount: chainSessions ? chainSessions.length : 0,
+      hasChainContext: !!chainContext,
+      hasChatHistory: chatHistory && chatHistory.length > 0,
+      chatHistoryCount: chatHistory ? chatHistory.length : 0,
+      chainId
+    });
     
-    // If we have an active session and it's status is active, allow sending
-    if (activeSession && activeSession.status === 'active') {
-      console.log("Allowing messages because activeSession status is active");
-      return true;
+    // Give priority to chainSessions
+    if (chainSessions && chainSessions.length > 0) {
+      // Create grouped sessions for display
+      const sessionsGrouped = processSessions(chainSessions);
+      console.log('Using chainSessions for sidebar', chainSessions.length, 'sessions');
+      
+      return (
+        <SectionList
+          sections={sessionsGrouped}
+          keyExtractor={(item) => item.session_id || item.chat_id || `session-${Date.now()}`}
+          renderItem={({ item, index, section }: { item: any; index: number; section: any }): JSX.Element => {
+            // Format time
+            const date = item.created_at ? new Date(item.created_at) : new Date();
+            const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            
+            // Determine if this is the last item in the section
+            const isLastInSection = index === section.data.length - 1;
+            
+            return (
+              <>
+                <TouchableOpacity
+                  style={[
+                    styles.chatHistoryItem,
+                    selectedChatId === (item.chat_id || item.session_id) && styles.selectedChatItem,
+                    { 
+                      backgroundColor: selectedChatId === (item.chat_id || item.session_id)
+                        ? (isDarkMode ? 'rgba(44, 94, 230, 0.3)' : 'rgba(44, 94, 230, 0.15)') 
+                        : (isDarkMode ? 'rgba(30, 40, 60, 0.3)' : 'rgba(255, 255, 255, 0.7)'),
+                      marginBottom: 8,
+                      borderRadius: 10,
+                      padding: moderateScale(12),
+                      borderLeftWidth: selectedChatId === (item.chat_id || item.session_id) ? 3 : 0,
+                      borderLeftColor: '#2C5EE6',
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: selectedChatId === (item.chat_id || item.session_id) ? 0.2 : 0,
+                      shadowRadius: 2,
+                      elevation: selectedChatId === (item.chat_id || item.session_id) ? 2 : 0,
+                    }
+                  ]}
+                  onPress={() => handleChatSelect(item.chat_id || item.session_id)}
+                >
+                  <View style={styles.chatHistoryContent}>
+                    <View style={styles.sessionHeaderRow}>
+                      <View style={styles.sessionStatusIndicator}>
+                        <View style={[
+                          styles.statusDot, 
+                          { backgroundColor: item.status === 'completed' ? '#4CAF50' : '#2C5EE6' }
+                        ]} />
+                        <Text style={[
+                          styles.sessionIdText, 
+                          { 
+                            color: isDarkMode ? '#ffffff' : theme.COLORS.primary.main,
+                            fontSize: fontScale(13),
+                            fontWeight: '600',
+                          }
+                        ]}>
+                          {(item.session_id || item.chat_id || '').substring(0, 8)}
+                        </Text>
+                      </View>
+                      <Text style={{
+                        color: isDarkMode ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)',
+                        fontSize: fontScale(12),
+                      }}>
+                        {timeString}
+                      </Text>
+                    </View>
+                    
+                    {/* Add notes or last message if available */}
+                    {(item.notes || item.last_message) && (
+                      <Text 
+                        style={[
+                          styles.chatHistoryMessage, 
+                          { 
+                            color: isDarkMode ? '#ffffff' : theme.COLORS.text.primary,
+                            fontSize: fontScale(14),
+                            fontWeight: selectedChatId === (item.chat_id || item.session_id) ? '500' : 'normal',
+                            marginTop: 6,
+                          }
+                        ]}
+                        numberOfLines={2}
+                        ellipsizeMode="tail"
+                      >
+                        {item.notes || item.last_message || `Session ${item.status || 'active'}`}
+                      </Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+                
+                {/* Add divider if not the last item in section */}
+                {!isLastInSection && (
+                  <View style={{
+                    height: 1, 
+                    backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+                    marginHorizontal: 20,
+                    marginBottom: 8
+                  }} />
+                )}
+              </>
+            );
+          }}
+          renderSectionHeader={renderSectionHeader}
+          contentContainerStyle={[styles.chatHistoryList, {
+            paddingVertical: moderateScale(8),
+            paddingHorizontal: moderateScale(8),
+          }]}
+          stickySectionHeadersEnabled={false}
+          ListEmptyComponent={(): JSX.Element => (
+            <View style={[styles.emptyContainer, {
+              padding: moderateScale(24),
+              alignItems: 'center',
+              justifyContent: 'center',
+            }]}>
+              <Ionicons 
+                name="document-text-outline"
+                size={48} 
+                color={isDarkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)'} 
+              />
+              <Text style={[styles.emptyText, { 
+                color: isDarkMode ? '#ffffff' : theme.COLORS.text.secondary,
+                marginTop: moderateScale(12),
+                fontSize: fontScale(16),
+                textAlign: 'center',
+              }]}>
+                No sessions found in this chain
+              </Text>
+            </View>
+          )}
+        />
+      );
+    } else if (chatHistory && chatHistory.length > 0) {
+      // Handle case when using regular chat history
+      console.log('Using chatHistory for sidebar', chatHistory.length, 'chats');
+      return (
+        <FlatList
+          data={chatHistory}
+          renderItem={({ item }: { item: ChatItem }): JSX.Element => {
+            // Format time
+            const date = new Date(item.last_message_time);
+            const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            
+            return (
+              <TouchableOpacity
+                style={[
+                  styles.chatHistoryItem,
+                  selectedChatId === item.chat_id && styles.selectedChatItem,
+                  { 
+                    backgroundColor: selectedChatId === item.chat_id 
+                      ? (isDarkMode ? 'rgba(44, 94, 230, 0.3)' : 'rgba(44, 94, 230, 0.15)') 
+                      : (isDarkMode ? 'rgba(30, 40, 60, 0.3)' : 'rgba(0,0,0,0.03)'),
+                    marginBottom: 8,
+                    borderRadius: 10,
+                    padding: moderateScale(12),
+                    borderLeftWidth: selectedChatId === item.chat_id ? 3 : 0,
+                    borderLeftColor: '#2C5EE6',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: selectedChatId === item.chat_id ? 0.2 : 0,
+                    shadowRadius: 2,
+                    elevation: selectedChatId === item.chat_id ? 2 : 0,
+                  }
+                ]}
+                onPress={() => handleChatSelect(item.chat_id)}
+              >
+                <View style={styles.chatHistoryContent}>
+                  <View style={styles.sessionHeaderRow}>
+                    <Text style={[
+                      styles.sessionIdText, 
+                      { 
+                        color: isDarkMode ? '#ffffff' : theme.COLORS.primary.main,
+                        fontSize: fontScale(13),
+                        fontWeight: '600',
+                      }
+                    ]}>
+                      {item.chat_id ? item.chat_id.substring(0, 8) : 'Chat'}
+                    </Text>
+                    <Text style={{
+                      color: isDarkMode ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)',
+                      fontSize: fontScale(12),
+                    }}>
+                      {timeString}
+                    </Text>
+                  </View>
+                  
+                  <Text 
+                    style={[
+                      styles.chatHistoryMessage, 
+                      { 
+                        color: isDarkMode ? '#ffffff' : theme.COLORS.text.primary,
+                        fontSize: fontScale(14),
+                        fontWeight: selectedChatId === item.chat_id ? '500' : 'normal',
+                        marginTop: 6,
+                      }
+                    ]}
+                    numberOfLines={2}
+                    ellipsizeMode="tail"
+                  >
+                    {item.last_message || 'No message content'}
+                  </Text>
+
+                  {item.unread_count > 0 && (
+                    <View style={[
+                      styles.unreadBadge, 
+                      { 
+                        backgroundColor: theme.COLORS.primary.main,
+                        borderRadius: 12,
+                        minWidth: 24,
+                        height: 24,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        paddingHorizontal: 5,
+                        position: 'absolute',
+                        top: 10,
+                        right: 10
+                      }
+                    ]}>
+                      <Text style={[
+                        styles.unreadCount,
+                        {
+                          color: theme.COLORS.background.paper,
+                          fontSize: fontScale(12),
+                          fontWeight: '600'
+                        }
+                      ]}>{item.unread_count}</Text>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          }}
+          keyExtractor={(item) => item.chat_id}
+          contentContainerStyle={[styles.chatHistoryList, { 
+            paddingVertical: moderateScale(8),
+            paddingHorizontal: moderateScale(8),
+          }]}
+          ListEmptyComponent={(): JSX.Element => (
+            <View style={[styles.emptyContainer, {
+              padding: moderateScale(24),
+              alignItems: 'center',
+              justifyContent: 'center',
+            }]}>
+              <Ionicons
+                name="chatbubbles-outline" 
+                size={48} 
+                color={isDarkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)'} 
+              />
+              <Text style={[styles.emptyText, { 
+                color: isDarkMode ? '#ffffff' : theme.COLORS.text.secondary,
+                marginTop: moderateScale(12),
+                fontSize: fontScale(16),
+                textAlign: 'center', 
+              }]}>
+                No conversations found
+              </Text>
+            </View>
+          )}
+        />
+      );
+    } else {
+      // Show empty state
+      console.log('No data for sidebar, showing empty state');
+      return (
+        <View style={[styles.emptyContainer, {
+          padding: moderateScale(24),
+          alignItems: 'center',
+          justifyContent: 'center',
+          flex: 1
+        }]}>
+          <Ionicons
+            name="chatbubbles-outline" 
+            size={48} 
+            color={isDarkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)'} 
+          />
+          <Text style={[styles.emptyText, { 
+            color: isDarkMode ? '#ffffff' : theme.COLORS.text.secondary,
+            marginTop: moderateScale(12),
+            fontSize: fontScale(16),
+            textAlign: 'center', 
+          }]}>
+            {chainId ? `No sessions found in chain ${chainId}` : 'No conversations yet'}
+          </Text>
+        </View>
+      );
     }
-    
-    // If no explicit status restrictions are set (backward compatibility)
-    if (!sessionStatus && !activeSession && !messageSessionStatus) {
-      console.log("Allowing messages because no status restrictions");
-      return true;
-    }
-    
-    console.log("Not allowing messages - no active status found");
-    return false;
   };
 
   if (isLoading) {
@@ -1335,7 +2002,7 @@ export default function ChatScreen({
               <View style={styles.messageList} key={`message-list-${messageKey}`}>
                 {(chainContext ? allMessages : messages).length === 0 ? (
                   <View style={styles.emptyContainer}>
-                    <Text style={[styles.emptyText, { color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary }]}>
+                    <Text style={[styles.emptyText, { color: isDarkMode ? '#ffffff' : theme.COLORS.text.secondary }]}>
                       {chainContext ? 'No messages in this chain' : 'No messages yet. Start a conversation!'}
                     </Text>
                   </View>
@@ -1360,12 +2027,41 @@ export default function ChatScreen({
         {/* Scroll to bottom button - only shown when scrolled up */}
         {showScrollToBottom && (
           <TouchableOpacity 
-            style={styles.scrollToBottomButton}
+            style={[
+              styles.scrollToBottomButton,
+              { 
+                backgroundColor: isDarkMode ? '#2C5EE6' : '#3063E9',
+                borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.8)'
+              }
+            ]}
             onPress={scrollToBottom}
             activeOpacity={0.7}
           >
             <Ionicons name="chevron-down" size={28} color="white" />
           </TouchableOpacity>
+        )}
+
+        {/* End Chat button - only shown when:
+            1. A bot message has can_end_chat flag set to true, OR
+            2. User has sent 10 or more messages
+            3. AND the chat is not already ended */}
+        {messages.length > 0 && (
+          <View style={styles.endChatButtonContainer}>
+            <TouchableOpacity
+              style={[
+                styles.endChatButton,
+                { 
+                  backgroundColor: isDarkMode ? '#E74C3C' : '#FF4D4D',
+                  borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.4)'
+                }
+              ]}
+              onPress={endChat}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close-circle-outline" size={22} color="white" style={{marginRight: 8}} />
+              <Text style={[styles.endChatButtonText, { fontSize: fontScale(15) }]}>End Chat</Text>
+            </TouchableOpacity>
+          </View>
         )}
 
         {/* Only render input when session is active or no restrictions are set */}
@@ -1509,7 +2205,7 @@ export default function ChatScreen({
           borderBottomWidth: 1,
         }]}>
           <Text style={[styles.sidebarTitle, { 
-            color: theme.COLORS.background.paper,
+            color: '#ffffff',
             fontWeight: '600',
             fontSize: fontScale(18),
           }]}>
@@ -1526,40 +2222,11 @@ export default function ChatScreen({
             <Ionicons 
               name="chevron-back" 
               size={24} 
-              color={theme.COLORS.background.paper}
+              color="#ffffff"
             />
           </TouchableOpacity>
         </View>
-        <FlatList
-          data={chainContext ? chainSessions : chatHistory}
-          renderItem={renderChatHistoryItem}
-          keyExtractor={item => chainContext && item.session_id ? `${item.chat_id}-${item.session_id}` : `chat-${item.chat_id}`}
-          contentContainerStyle={[styles.chatHistoryList, {
-            paddingVertical: moderateScale(8),
-            paddingHorizontal: moderateScale(8),
-          }]}
-          ListEmptyComponent={() => (
-            <View style={[styles.emptyContainer, {
-              padding: moderateScale(24),
-              alignItems: 'center',
-              justifyContent: 'center',
-            }]}>
-              <Ionicons 
-                name={chainContext ? "document-text-outline" : "chatbubble-outline"} 
-                size={48} 
-                color={isDarkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)'} 
-              />
-              <Text style={[styles.emptyText, { 
-                color: isDarkMode ? 'rgba(255,255,255,0.7)' : theme.COLORS.text.secondary,
-                marginTop: moderateScale(12),
-                fontSize: fontScale(16),
-                textAlign: 'center',
-              }]}>
-                {chainContext ? 'No sessions in this chain' : 'No chat history available'}
-              </Text>
-            </View>
-          )}
-        />
+        {renderSidebar()}
       </Animated.View>
 
       {/* Add overlay when sidebar is open */}
@@ -1638,6 +2305,7 @@ const styles = StyleSheet.create({
   },
   chatHistoryContent: {
     flex: 1,
+    flexDirection: 'column',
   },
   chatIconContainer: {
     width: 40,
@@ -1868,30 +2536,29 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   sessionMarker: {
-    alignSelf: 'center',
-    backgroundColor: 'rgba(44, 94, 230, 0.15)',
-    borderRadius: 12,
-    paddingHorizontal: horizontalScale(16),
-    paddingVertical: verticalScale(16),
-    borderWidth: 1,
-    borderColor: 'rgba(44, 94, 230, 0.5)',
-    marginVertical: verticalScale(32),
     width: '100%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 4,
+    alignSelf: 'center',
+    marginVertical: verticalScale(12),
+    paddingVertical: verticalScale(8),
+    paddingHorizontal: horizontalScale(12),
+    borderRadius: 8,
   },
+  
   sessionMarkerContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    padding: moderateScale(8),
   },
+  
   sessionMarkerText: {
-    fontSize: fontScale(15),
-    fontWeight: '600',
-    marginLeft: horizontalScale(8),
+    fontSize: fontScale(14),
+    fontWeight: '500',
+  },
+  
+  divider: {
+    width: '100%',
+    height: 1,
+    marginVertical: verticalScale(8),
   },
   senderLabel: {
     fontSize: fontScale(12),
@@ -1906,12 +2573,6 @@ const styles = StyleSheet.create({
   scrollIndicatorInHeader: {
     marginRight: horizontalScale(8),
   },
-  divider: {
-    height: 2,
-    backgroundColor: 'rgba(44, 94, 230, 0.4)',
-    marginVertical: verticalScale(16),
-    width: '100%',
-  },
   inputWrapper: {
     width: '100%',
     backgroundColor: 'transparent',
@@ -1922,39 +2583,36 @@ const styles = StyleSheet.create({
   messagesContainer: {
     flex: 1,
     width: '100%',
+    paddingHorizontal: horizontalScale(8),
   },
   typingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
+    padding: moderateScale(8),
   },
   typingDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
     marginHorizontal: 2,
-    opacity: 0.6
   },
   scrollToBottomButton: {
     position: 'absolute',
     left: '50%',
-    bottom: 100,
-    transform: [{ translateX: -25 }],
-    backgroundColor: '#2C5EE6',
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
+    bottom: verticalScale(90),
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.4,
-    shadowRadius: 3,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.27,
+    shadowRadius: 4.65,
+    elevation: 6,
     zIndex: 100,
     borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.6)',
+    transform: [{ translateX: -22 }], // Center the button by offsetting half its width
   },
   micButton: {
     width: horizontalScale(40),
@@ -1970,5 +2628,56 @@ const styles = StyleSheet.create({
     right: 0,
     padding: 16,
     zIndex: 100,
+  },
+  endChatButtonContainer: {
+    position: 'absolute',
+    left: horizontalScale(16),
+    bottom: verticalScale(90), // Move higher up to ensure visibility
+    zIndex: 999, // Higher z-index to ensure it's on top
+  },
+  endChatButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10, // Slightly taller
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.27,
+    shadowRadius: 4.65,
+    elevation: 8, // Increased elevation
+    borderWidth: 2, // Thicker border
+  },
+  endChatButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: fontScale(14),
+  },
+  sessionDateHeader: {
+    backgroundColor: 'rgba(230, 240, 255, 0.8)',
+    paddingVertical: verticalScale(6),
+    paddingHorizontal: horizontalScale(12),
+    marginVertical: verticalScale(4),
+    borderRadius: 4,
+  },
+  sessionDateHeaderText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: fontScale(13),
+    fontWeight: '500',
+  },
+  sessionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  sessionStatusIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
   },
 }); 
