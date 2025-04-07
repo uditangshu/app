@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,6 +15,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { horizontalScale, verticalScale, moderateScale, fontScale } from '../../utils/responsive';
 import { useAuth } from '../../contexts/AuthContext';
+import { getNotificationStatus, requestNotificationPermissions, registerForPushNotifications } from '../../utils/notifications';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface SettingItem {
   icon: string;
@@ -29,13 +32,65 @@ export default function SettingsScreen() {
   const { isDarkMode, toggleTheme, theme } = useTheme();
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+
+  useEffect(() => {
+    // Check if notifications are enabled on component mount
+    checkNotificationPermissions();
+  }, []);
+
+  const checkNotificationPermissions = async () => {
+    try {
+      const isEnabled = await getNotificationStatus();
+      setNotificationsEnabled(isEnabled);
+    } catch (error) {
+      console.error('Error checking notification permissions:', error);
+    }
+  };
+
+  const toggleNotifications = async (value: boolean) => {
+    try {
+      if (value) {
+        // If user is enabling notifications, request permissions
+        const granted = await requestNotificationPermissions();
+        
+        if (!granted) {
+          // Permission denied
+          showToast('Notification permission denied');
+          return false;
+        }
+        
+        // Register for push notifications
+        const registered = await registerForPushNotifications();
+        
+        if (!registered) {
+          showToast('Failed to register for push notifications');
+          return false;
+        }
+        
+        // Permission granted and registration successful
+        showToast('Notifications enabled');
+        await AsyncStorage.setItem('notificationsEnabled', 'true');
+        return true;
+      } else {
+        // User is disabling notifications
+        await AsyncStorage.setItem('notificationsEnabled', 'false');
+        showToast('Notifications disabled');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error toggling notifications:', error);
+      showToast('Failed to update notification settings');
+      return notificationsEnabled; // Return current state on error
+    }
+  };
 
   const showToast = (message: string) => {
     setToastMessage(message);
     setToastVisible(true);
     setTimeout(() => {
       setToastVisible(false);
-    }, 1000);
+    }, 3000);
   };
 
   const [settings, setSettings] = useState<SettingItem[]>([
@@ -46,6 +101,18 @@ export default function SettingsScreen() {
       type: 'toggle',
       value: isDarkMode,
       onToggle: () => toggleTheme(),
+    },
+    {
+      icon: 'notifications-outline',
+      title: 'Push Notifications',
+      subtitle: 'Enable or disable push notifications',
+      type: 'toggle',
+      value: notificationsEnabled,
+      onToggle: async (value) => {
+        const newValue = await toggleNotifications(value);
+        setNotificationsEnabled(newValue);
+        return newValue;
+      },
     },
     {
       icon: 'language-outline',
@@ -98,6 +165,23 @@ export default function SettingsScreen() {
       },
     },
   ]);
+
+  // Update settings when notificationsEnabled changes
+  useEffect(() => {
+    const newSettings = [...settings];
+    // Find the notifications setting (should be at index 1)
+    const notificationSettingIndex = newSettings.findIndex(
+      setting => setting.title === 'Push Notifications'
+    );
+    
+    if (notificationSettingIndex !== -1) {
+      newSettings[notificationSettingIndex] = {
+        ...newSettings[notificationSettingIndex],
+        value: notificationsEnabled
+      };
+      setSettings(newSettings);
+    }
+  }, [notificationsEnabled]);
 
   const handleToggle = (index: number, value: boolean) => {
     const newSettings = [...settings];

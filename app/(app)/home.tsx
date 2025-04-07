@@ -21,6 +21,8 @@ import { API_URL } from '../../constants/api';
 import NotificationsModal from '../modals/notifications';
 import Shimmer from '../components/Shimmer';
 import { useTheme } from '../../contexts/ThemeContext';
+import { scheduleNotification } from '../../utils/notifications';
+import PushNotification from 'react-native-push-notification';
 
 // interface EventItem {
 //   id: string;
@@ -269,9 +271,10 @@ export default function HomeScreen() {
         chatId = pendingSession.chat_id;
       }
 
-      const requestBody = chainId 
-        ? { chainId: chainId, status: "bot" }
-        : { chatId: chatId, status: "bot" };
+      const requestBody = {
+        chatId: chatId,
+        status: "bot"
+      };
 
       const response = await fetch(`${API_URL}/llm/chat/initiate-chat`, {
         method: 'PATCH',
@@ -754,6 +757,49 @@ export default function HomeScreen() {
   const gradientColors = isDarkMode 
     ? ['#2C5EE6', '#1A3A99', '#0A1E4D'] // Dark blue gradient
     : ['#E8F1FF', '#C8E1FF', '#A5D1FF']; // Light blue gradient
+
+  // Set up notification listeners
+  useEffect(() => {
+    // The listeners are already set up in the PushNotification.configure() call in utils/notifications.ts
+    // Here we can add app-specific behavior for when notifications are received
+
+    try {
+      // Get initial notification that opened the app - safely
+      PushNotification.popInitialNotification((notification) => {
+        if (notification) {
+          console.log('Initial notification:', notification);
+          
+          // Handle the notification data
+          const data = notification.data || {};
+          
+          if (data.type === 'chat' && data.chatId) {
+            setSelectedChatId(data.chatId);
+            showChat(data.chatId);
+          } else if (data.type === 'chain' && data.chainId) {
+            toggleChainExpand(data.chainId);
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error handling initial notification:', error);
+    }
+
+    // This is used to remove any listeners
+    return () => {
+      // Cleanup is handled by the PushNotification library internally
+    };
+  }, []);
+
+  // Demo function to send a test notification
+  const sendTestNotification = async () => {
+    if (!profile) return;
+    
+    await scheduleNotification(
+      'New message received',
+      `You have a new message in your inbox`,
+      { type: 'chat', employeeId: profile.employee_id }
+    );
+  };
 
   return (
     <SafeAreaView 
