@@ -11,6 +11,7 @@ import {
   AppState,
   useWindowDimensions,
   Platform,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -74,6 +75,7 @@ interface EmployeeProfile {
     total_sessions: number;
     last_5_scores: number[];
   };
+  meeting_link: string;
   chat_summary: {
     chat_id: string;
     last_message: string;
@@ -1221,7 +1223,42 @@ export default function HomeScreen() {
                     </View>
                     <Text style={[styles.updateLabel, { color: isDarkMode ? 'rgba(255, 255, 255, 0.7)' : theme.COLORS.text.secondary }]}>Upcoming</Text>
                     <Text style={[styles.updateValue, { color: isDarkMode ? 'white' : theme.COLORS.text.primary }]}>{profile.upcoming_meets}</Text>
-                    <Text style={[styles.updateSubtext, { color: isDarkMode ? 'rgba(255, 255, 255, 0.5)' : theme.COLORS.text.secondary }]}>meetings</Text>
+                    {profile.meeting_link ? (
+                      <TouchableOpacity 
+                        onPress={() => {
+                          if (profile.meeting_link) {
+                            Linking.openURL(profile.meeting_link).catch(err => 
+                              console.error('Error opening meeting link:', err)
+                            );
+                          }
+                        }}
+                        style={styles.meetingLinkContainer}
+                      >
+                        <Text 
+                          style={[
+                            styles.updateSubtext, 
+                            { 
+                              color: theme.COLORS.primary.main,
+                              textDecorationLine: 'underline'
+                            }
+                          ]}
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                        >
+                          {profile.meeting_link}
+                        </Text>
+                        <Ionicons 
+                          name="open-outline" 
+                          size={14} 
+                          color={theme.COLORS.primary.main} 
+                          style={{ marginLeft: 4 }} 
+                        />
+                      </TouchableOpacity>
+                    ) : (
+                      <Text style={[styles.updateSubtext, { color: isDarkMode ? 'rgba(255, 255, 255, 0.5)' : theme.COLORS.text.secondary }]}>
+                        No meetings scheduled
+                      </Text>
+                    )}
                   </View>
 
                   {/* Upcoming Sessions */}
@@ -1917,5 +1954,13 @@ const styles = StyleSheet.create({
     right: 0,
     padding: 16,
     zIndex: 100,
+  },
+  meetingLinkContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: verticalScale(4),
+    paddingVertical: verticalScale(4),
+    paddingHorizontal: horizontalScale(2),
+    borderRadius: 4,
   },
 });

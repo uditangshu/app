@@ -6,7 +6,7 @@ const isProduction = APP_ENV === 'production';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: isProduction ? 'Employee Portal' : 'Employee Portal (Dev)',
+  name: isProduction ? 'DeloConnect' : 'DeloConnect (Dev)',
   slug: 'employee-app',
   version: '1.0.0',
   orientation: 'portrait',
